@@ -1,2 +1,0 @@
-import {loadLiveSheetProjects} from "../../google-sheet-live";
-export async function GET(){try{const projects=[...(await loadLiveSheetProjects()).values()];return Response.json({projects,syncedAt:new Date().toISOString()},{headers:{"cache-control":"no-store, no-cache, must-revalidate"}})}catch{return Response.json({error:"تعذر تحديث Google Sheets مؤقتًا"},{status:502,headers:{"cache-control":"no-store"}})}}

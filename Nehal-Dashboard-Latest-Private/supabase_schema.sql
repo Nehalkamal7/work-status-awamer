@@ -204,34 +204,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION get_projects_by_stage_summary()
-RETURNS JSONB AS $$
-DECLARE
-    result JSONB;
-BEGIN
-    SELECT jsonb_object_agg(stage, count)
-    FROM (
-        SELECT status AS stage, COUNT(*) AS count
-        FROM public.projects
-        GROUP BY status
-    ) t INTO result;
-
-    RETURN COALESCE(result, '{}'::jsonb);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- 7. Row-Level Security (RLS) Policies
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.integrations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.workday_plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sync_conflicts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
 
--- Default Policies (Allow full access for authenticated/anon during development setup)
 CREATE POLICY "Allow public select on projects" ON public.projects FOR SELECT USING (true);
 CREATE POLICY "Allow public insert on projects" ON public.projects FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update on projects" ON public.projects FOR UPDATE USING (true);
@@ -241,9 +217,3 @@ CREATE POLICY "Allow public select on tasks" ON public.tasks FOR SELECT USING (t
 CREATE POLICY "Allow public insert on tasks" ON public.tasks FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update on tasks" ON public.tasks FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete on tasks" ON public.tasks FOR DELETE USING (true);
-
-CREATE POLICY "Allow public select on notifications" ON public.notifications FOR SELECT USING (true);
-CREATE POLICY "Allow public update on notifications" ON public.notifications FOR UPDATE USING (true);
-
-CREATE POLICY "Allow public select on workday_plans" ON public.workday_plans FOR SELECT USING (true);
-CREATE POLICY "Allow public insert/update on workday_plans" ON public.workday_plans FOR ALL USING (true);

@@ -1,1 +1,0 @@
-CREATE INDEX `idx_whatsapp_updates_date` ON `whatsapp_updates` (`message_date`);

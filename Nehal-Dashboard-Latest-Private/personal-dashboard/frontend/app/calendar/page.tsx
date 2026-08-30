@@ -1,1 +1,0 @@
-import StatusPage from "@/components/StatusPage";const now=new Date(), later=new Date(now.getFullYear(),now.getMonth()+2,0);export default function Page(){return <StatusPage title="Calendar" kicker="DEADLINES & MILESTONES" endpoint={`/calendar?start=${now.toISOString().slice(0,10)}&end=${later.toISOString().slice(0,10)}`}/>}
