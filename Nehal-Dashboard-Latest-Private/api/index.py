@@ -178,9 +178,9 @@ async def render_dashboard(request: Request):
 
     try:
         return templates.TemplateResponse(
-            name="dashboard.html",
-            context={
-                "request": request,
+            request,
+            "dashboard.html",
+            {
                 "projects": projects,
                 "kpis": kpis,
                 "stages": STAGES,
