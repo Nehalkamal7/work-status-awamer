@@ -1,43 +1,106 @@
-<div class="project-card glass-card rounded-3xl p-6 border-t-4 transition hover:border-lime" data-stage="{{ p.status }}">
-    <div class="flex justify-between items-start mb-4">
+<div class="project-card glass-card rounded-3xl p-6 border-t-4 transition duration-300 hover:border-lime hover:shadow-xl hover:shadow-lime/5 relative overflow-hidden" 
+     data-id="{{ p.id }}"
+     data-stage="{{ p.status }}"
+     data-priority="{{ p.priority }}"
+     data-progress="{{ p.progress }}"
+     data-completed="{% if p.progress >= 100 or p.status == 'التسليم' %}true{% else %}false{% endif %}"
+     data-report="{% if p.daily_report and p.daily_report.strip() %}true{% else %}false{% endif %}">
+    
+    <!-- Top Bar: Source & Actions -->
+    <div class="flex justify-between items-start mb-3 gap-2">
         <div>
-            <span class="text-xs text-slate-400 font-bold block">{{ p.source_id or p.source or 'LOCAL' }}</span>
-            <h4 class="text-xl font-black text-white mt-1">{{ p.name }}</h4>
-            <span class="text-xs text-slate-300">العميل: {{ p.client or 'غير محدد' }}</span>
+            <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                <span class="px-2.5 py-0.5 text-[11px] font-black rounded-md bg-white/10 text-slate-300">
+                    {{ p.source_id or p.source or 'LOCAL' }}
+                </span>
+                <!-- Stage Pill -->
+                <span class="px-2.5 py-0.5 text-[11px] font-black rounded-md bg-lime/10 text-lime border border-lime/20">
+                    📌 Stage: {{ p.status or 'التحليل' }}
+                </span>
+            </div>
+            <h4 class="text-xl font-black text-white leading-snug">{{ p.name }}</h4>
+            <span class="text-xs text-slate-300 block mt-1">👤 العميل: <b class="text-slate-200">{{ p.client or 'غير محدد' }}</b></span>
         </div>
-        <div class="flex gap-2">
-            <button onclick='openModal({{ p | tojson }})' class="px-3 py-1 text-xs font-bold bg-white/10 text-white rounded-lg hover:bg-white/20">تعديل</button>
-            <button onclick="deleteProject('{{ p.id }}')" class="px-3 py-1 text-xs font-bold bg-rust/20 text-rust rounded-lg hover:bg-rust/30">حذف</button>
+        <div class="flex items-center gap-2 shrink-0">
+            <button onclick="openModal('{{ p.id }}')" title="تعديل" class="px-3 py-1.5 text-xs font-bold bg-white/10 text-white rounded-xl hover:bg-lime hover:text-navy-900 transition flex items-center gap-1">
+                ✏️ تعديل
+            </button>
+            <button onclick="deleteProject('{{ p.id }}')" title="حذف" class="px-3 py-1.5 text-xs font-bold bg-rust/10 text-rust rounded-xl hover:bg-rust hover:text-white transition flex items-center gap-1">
+                🗑️ حذف
+            </button>
         </div>
     </div>
-    
-    <div class="grid grid-cols-2 gap-2 text-xs mb-4">
+
+    <!-- Metadata Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-4">
+        <!-- Deadline Box -->
         <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block">موعد التسليم</span>
-            <b class="text-white mt-0.5 block">{{ p.deadline or 'غير محدد' }}</b>
+            <span class="text-slate-400 block text-[11px] font-semibold">📅 موعد التسليم</span>
+            <b class="text-white mt-0.5 block font-bold text-xs truncate">
+                {{ p.deadline or 'غير محدد' }}
+            </b>
         </div>
+        <!-- Priority Box -->
         <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block">الأولوية</span>
-            <b class="{% if p.priority == 'CRITICAL' %}text-rust{% elif p.priority == 'HIGH' %}text-orange-400{% else %}text-sky-400{% endif %} mt-0.5 block">{{ p.priority }}</b>
+            <span class="text-slate-400 block text-[11px] font-semibold">⚡ الأولوية</span>
+            <b class="mt-0.5 block font-black text-xs 
+                {% if p.priority == 'CRITICAL' %}text-rust
+                {% elif p.priority == 'HIGH' %}text-orange-400
+                {% elif p.priority == 'MEDIUM' %}text-sky-400
+                {% else %}text-slate-300{% endif %}">
+                {% if p.priority == 'CRITICAL' %}🚨 حرج
+                {% elif p.priority == 'HIGH' %}🔥 عالي
+                {% elif p.priority == 'MEDIUM' %}⚡ متوسط
+                {% else %}☕ منخفض{% endif %}
+            </b>
         </div>
+        <!-- Progress Box -->
         <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block">نسبة الإنجاز</span>
-            <b class="text-lime mt-0.5 block">{{ p.progress }}%</b>
+            <span class="text-slate-400 block text-[11px] font-semibold">📊 نسبة الإنجاز</span>
+            <b class="mt-0.5 block font-black text-xs
+                {% if p.progress >= 100 %}text-sky-400
+                {% elif p.progress >= 70 %}text-lime
+                {% elif p.progress >= 30 %}text-amber-400
+                {% else %}text-rust{% endif %}">
+                {{ p.progress }}%
+            </b>
         </div>
+        <!-- Assigned To Box -->
         <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block">المسؤول</span>
-            <b class="text-white mt-0.5 block">{{ p.assigned_to or 'غير محدد' }}</b>
+            <span class="text-slate-400 block text-[11px] font-semibold">🎯 المسؤول</span>
+            <b class="text-white mt-0.5 block font-bold text-xs truncate">{{ p.assigned_to or 'غير محدد' }}</b>
         </div>
     </div>
 
     <!-- Progress Bar -->
-    <div class="w-full bg-navy-900 rounded-full h-2 mb-4 overflow-hidden">
-        <div class="bg-lime h-2 rounded-full" style="width: {{ p.progress }}%"></div>
+    <div class="w-full bg-navy-900/80 rounded-full h-2.5 mb-4 overflow-hidden p-0.5 border border-white/5">
+        <div class="h-1.5 rounded-full transition-all duration-500
+            {% if p.progress >= 100 %}bg-gradient-to-r from-sky-400 to-blue-500
+            {% elif p.progress >= 70 %}bg-gradient-to-r from-lime to-emerald-400
+            {% elif p.progress >= 30 %}bg-gradient-to-r from-amber-400 to-yellow-500
+            {% else %}bg-gradient-to-r from-rust to-red-600{% endif %}" 
+            style="width: {{ p.progress }}%">
+        </div>
     </div>
 
     <!-- Daily Report Box -->
-    <div class="bg-navy-900 rounded-2xl p-4 border-r-4 border-rust">
-        <span class="text-xs font-black text-rust block">📝 التقرير اليومي:</span>
-        <p class="text-xs text-slate-300 mt-1 whitespace-pre-wrap leading-relaxed">{{ p.daily_report or 'لم يُكتب تقرير اليوم بعد.' }}</p>
+    <div class="bg-navy-900/90 rounded-2xl p-3.5 border-r-4 {% if p.daily_report and p.daily_report.strip() %}border-lime{% else %}border-slate-600{% endif %}">
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-lime flex items-center gap-1">
+                📝 التقرير اليومي:
+            </span>
+            {% if p.daily_report and p.daily_report.strip() %}
+            <span class="text-[10px] text-lime/80 bg-lime/10 px-2 py-0.5 rounded-full">مُحدث</span>
+            {% endif %}
+        </div>
+        <p class="text-xs text-slate-300 mt-1.5 whitespace-pre-wrap leading-relaxed">
+            {{ p.daily_report or 'لم يُكتب تقرير اليوم بعد.' }}
+        </p>
     </div>
+
+    {% if p.description and p.description.strip() %}
+    <div class="mt-3 text-xs text-slate-400 bg-navy-800/40 p-2.5 rounded-xl border border-white/5">
+        <span class="font-bold text-slate-300">💡 ملاحظات:</span> {{ p.description }}
+    </div>
+    {% endif %}
 </div>

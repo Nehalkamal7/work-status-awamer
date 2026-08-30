@@ -5,18 +5,27 @@ Complete, modular Python rebuild of Nehal's Project Command Center dashboard des
 ## 📁 Repository Structure
 
 ```
-Nehal-Dashboard-Latest-Private/
+.
 ├── vercel.json             # Vercel Serverless Function deployment config
-├── requirements.txt        # Python dependencies (fastapi, supabase, uvicorn, jinja2)
+├── requirements.txt        # Python dependencies (fastapi, supabase, uvicorn, jinja2, websockets)
 ├── .env.example            # Environment variables template
 ├── supabase_schema.sql     # PostgreSQL SQL migration script for Supabase SQL Editor
 ├── api/
-│   └── index.py            # FastAPI entrypoint & Supabase database queries
+│   └── index.py            # FastAPI entrypoint, database client singleton & REST endpoints
 ├── templates/
-│   ├── dashboard.html      # Glassmorphic RTL dashboard UI with modal forms
-│   └── project_card.html   # Reusable project card component
+│   ├── dashboard.html      # Glassmorphic RTL dashboard UI with modal forms & interactive KPIs
+│   └── project_card.html   # Reusable project card component with stage badges & progress bars
 └── README.md
 ```
+
+## 🚀 Key Features
+
+- **Glassmorphic RTL UI**: Beautiful dark mode aesthetic styled with Cairo typography and smooth micro-animations.
+- **Interactive KPI Metrics**: Quick filter projects by Urgent, Completed, or Daily Report status with a single click.
+- **Stage Pills & Progress Visuals**: Visual stage badges ("التحليل", "التصميم", "البرمجة", "الاختبار والمراجعة", "التسليم", "الدعم الفني") and dynamic progress bar colors.
+- **Pydantic Validation**: Sanitized date input handling (`""` to `None`) and float range clamping to prevent PostgreSQL errors.
+- **Safe JS Data Binding**: Prevents quotes and multi-line breaks in reports from crashing modal popups.
+- **Toast Notifications**: Interactive feedback on saving, updating, and deleting projects.
 
 ## 🚀 Quick Vercel Deployment Instructions
 
@@ -24,7 +33,7 @@ Nehal-Dashboard-Latest-Private/
 
 1. Open your terminal in this repository folder:
    ```powershell
-   cd "c:\yarab\work status awamer\Nehal-Dashboard-Latest-Private"
+   cd "c:\yarab\work status awamer"
    ```
 
 2. Run `vercel`:
@@ -45,7 +54,7 @@ Nehal-Dashboard-Latest-Private/
 
 ### Method B: Deploy via GitHub & Vercel Dashboard
 
-1. Push this clean repository to GitHub.
+1. Push this repository to GitHub.
 2. Log into [Vercel Dashboard](https://vercel.com/new) -> **Import Repository**.
 3. Under **Environment Variables**, add:
    - `SUPABASE_URL` = `https://your-project-id.supabase.co`
@@ -56,4 +65,4 @@ Nehal-Dashboard-Latest-Private/
 
 ## 📊 Database Setup
 
-Before deploying, ensure you have executed [`supabase_schema.sql`](file:///c:/yarab/work%20status%20awamer/Nehal-Dashboard-Latest-Private/supabase_schema.sql) in your **Supabase SQL Editor** to create all tables, indexes, RLS policies, and server-side RPC functions (`get_dashboard_kpis()`).
+Before deploying, ensure you have executed [`supabase_schema.sql`](file:///c:/yarab/work%20status%20awamer/supabase_schema.sql) in your **Supabase SQL Editor** to create all tables, indexes, RLS policies, and server-side RPC functions (`get_dashboard_kpis()`).
