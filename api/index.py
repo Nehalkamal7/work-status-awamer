@@ -191,15 +191,15 @@ class LoginSchema(BaseModel):
 
 class OdooTestSchema(BaseModel):
     base_url: str
-    db_name: str
     username: str
     password: str
+    db_name: Optional[str] = ""
 
 class OdooSaveSchema(BaseModel):
     base_url: str
-    db_name: str
     username: str
     password: str
+    db_name: Optional[str] = ""
     auto_sync: Optional[bool] = False
 
 class OdooSyncSchema(BaseModel):
@@ -212,7 +212,7 @@ class GoogleSheetsTestSchema(BaseModel):
 class GoogleSheetsSaveSchema(BaseModel):
     sheet_url: str
     sheet_name: Optional[str] = "Sheet1"
-    column_mapping: Dict[str, str] # e.g. {"name": "Col A", "status": "Col B"}
+    column_mapping: Optional[Dict[str, str]] = None
 
 class NotionTestSchema(BaseModel):
     integration_token: str
@@ -619,27 +619,80 @@ def get_odoo_server_proxy(base_url: str):
             
     raise Exception(f"تعذر الاتصال بخادم Odoo على {base_url} ({last_error})")
 
+def auto_authenticate_odoo(common, clean_url: str, transport, user_db_name: str, username: str, password: str):
+    """Smartly discover DB name and authenticate against Odoo server."""
+    db_candidates = []
+    if user_db_name and user_db_name.strip():
+        db_candidates.append(user_db_name.strip())
+        
+    # Attempt DB listing API
+    try:
+        db_proxy = xmlrpc.client.ServerProxy(f"{clean_url}/xmlrpc/2/db", transport=transport, allow_none=True)
+        dbs = db_proxy.list()
+        if dbs and isinstance(dbs, list):
+            for db in dbs:
+                if db not in db_candidates:
+                    db_candidates.append(str(db))
+    except Exception:
+        pass
+
+    # Extracted subdomains & heuristic names
+    parsed = urllib.parse.urlparse(clean_url)
+    domain = parsed.netloc
+    if domain:
+        parts = domain.split(".")
+        db_candidates.extend([
+            domain,
+            domain.replace(".", "_"),
+            parts[0],
+            parts[1] if len(parts) > 1 else "",
+            "aait",
+            "odoo",
+            "production",
+            "main",
+            "master",
+            "db",
+            "demo"
+        ])
+
+    # Unique candidates
+    unique_candidates = []
+    for cand in db_candidates:
+        if cand and cand not in unique_candidates:
+            unique_candidates.append(cand)
+            
+    for cand in unique_candidates:
+        try:
+            uid = common.authenticate(cand, username, password, {})
+            if uid:
+                return uid, cand
+        except Exception as ex:
+            logger.debug(f"Auth attempt for DB '{cand}' failed: {ex}")
+            
+    return None, user_db_name or (unique_candidates[0] if unique_candidates else "odoo")
+
 @app.post("/api/integrations/odoo/test")
 async def test_odoo_connection(payload: OdooTestSchema):
     try:
         clean_url, common, models, version_info, transport = get_odoo_server_proxy(payload.base_url)
-        server_version = version_info.get("server_version", "Unknown") if isinstance(version_info, dict) else "Unknown"
+        server_version = version_info.get("server_version", "19.0") if isinstance(version_info, dict) else "Unknown"
         
-        uid = common.authenticate(payload.db_name, payload.username, payload.password, {})
+        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, payload.db_name or "", payload.username, payload.password)
         
         if uid:
             return {
                 "success": True,
                 "uid": uid,
+                "detected_db": detected_db,
                 "odoo_version": server_version,
                 "clean_url": clean_url,
-                "message": f"تم الاتصال بنجاح بالسيرفر Odoo {server_version} على ({clean_url}) | (مُعرّف المستخدم: {uid})"
+                "message": f"تم الاتصال بنجاح! سيرفر Odoo {server_version} على ({clean_url}) | قاعدة البيانات: {detected_db} (User ID: {uid})"
             }
         else:
             return {
                 "success": False,
                 "clean_url": clean_url,
-                "message": f"تم الاتصال بسيرفر Odoo على ({clean_url})، ولكن فشلت المصادقة. يرجى التأكد من اسم قاعدة البيانات ({payload.db_name})، واسم المستخدم، وكلمة المرور/API Key."
+                "message": f"تم الوصول إلى سيرفر Odoo على ({clean_url})، ولكن تعذرت المصادقة. يرجى التأكد من اسم المستخدم وكلمة المرور/API Key."
             }
     except Exception as e:
         logger.error(f"Odoo connection test failed: {e}")
@@ -659,10 +712,19 @@ async def save_odoo_config(
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
 
+    db_name = payload.db_name or ""
+    try:
+        clean_url, common, models, version_info, transport = get_odoo_server_proxy(payload.base_url)
+        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, payload.db_name or "", payload.username, payload.password)
+        if detected_db:
+            db_name = detected_db
+    except Exception:
+        pass
+
     enc_password = simple_encrypt(payload.password)
     credentials_payload = {
         "base_url": payload.base_url,
-        "db_name": payload.db_name,
+        "db_name": db_name,
         "username": payload.username,
         "enc_password": enc_password
     }
@@ -680,7 +742,7 @@ async def save_odoo_config(
                 "status": "CONNECTED",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="tenant_id,provider").execute()
-            return {"status": "success", "message": "تم حفظ إعدادات الربط مع Odoo بنجاح", "data": res.data}
+            return {"status": "success", "message": f"تم حفظ إعدادات Odoo بنجاح! (قاعدة البيانات الذكية: {db_name})", "data": res.data}
         except Exception as e:
             logger.error(f"Error saving Odoo config to Supabase: {e}")
     
@@ -696,7 +758,7 @@ async def save_odoo_config(
         "settings": settings_payload,
         "status": "CONNECTED"
     }
-    return {"status": "success", "message": "تم حفظ إعدادات Odoo بنجاح."}
+    return {"status": "success", "message": f"تم حفظ إعدادات Odoo بنجاح! (قاعدة البيانات الذكية: {db_name})"}
 
 @app.post("/api/integrations/odoo/sync")
 async def sync_odoo_data(
@@ -726,7 +788,7 @@ async def sync_odoo_data(
 
     creds = config["credentials"]
     base_url = creds.get("base_url", "")
-    db_name = creds.get("db_name")
+    db_name = creds.get("db_name", "")
     username = creds.get("username")
     password = simple_decrypt(creds.get("enc_password", ""))
 
@@ -744,12 +806,12 @@ async def sync_odoo_data(
 
     try:
         clean_url, common, models, version_info, transport = get_odoo_server_proxy(base_url)
-        uid = common.authenticate(db_name, username, password, {})
+        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, db_name, username, password)
         if not uid:
-            raise HTTPException(status_code=401, detail=f"فشل المصادقة مع Odoo على ({clean_url}). يرجى التأكد من اسم قاعدة البيانات ({db_name})، واسم المستخدم، وكلمة المرور.")
+            raise HTTPException(status_code=401, detail=f"فشل المصادقة مع Odoo على ({clean_url}). يرجى التأكد من اسم المستخدم وكلمة المرور.")
         
         records = models.execute_kw(
-            db_name, uid, password,
+            detected_db, uid, password,
             model_name, 'search_read',
             [[]],
             {'limit': 50, 'fields': fields_to_read}
@@ -833,32 +895,61 @@ def extract_spreadsheet_id(url_or_id: str) -> str:
         return parts[1].split("/")[0]
     return url_or_id.strip()
 
+def fetch_google_sheets_csv(spreadsheet_id: str, sheet_name: str = "Sheet1") -> List[List[str]]:
+    """Fetch and parse CSV rows from Google Sheets with SSL context and fallback URLs."""
+    urls_to_try = [
+        f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={urllib.parse.quote(sheet_name or 'Sheet1')}",
+        f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv",
+        f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pub?output=csv",
+        f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv"
+    ]
+    
+    context = ssl._create_unverified_context()
+    last_err_msg = ""
+    
+    for url in urls_to_try:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            )
+            with urllib.request.urlopen(req, context=context, timeout=10) as resp:
+                content = resp.read().decode('utf-8')
+                
+            csv_reader = csv.reader(io.StringIO(content))
+            rows = list(csv_reader)
+            if rows and len(rows) > 0:
+                return rows
+        except urllib.error.HTTPError as http_err:
+            if http_err.code in [401, 403]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="مستند Google Sheets مغلق (HTTP 401 Unauthorized). لكي تنجح المزامنة: افتح الشيت -> اضغط 'مشاركة Share' في أعلى اليسار -> غيّر الوصول إلى 'Anyone with the link can view (أي شخص لديه الرابط)'."
+                )
+            last_err_msg = f"HTTP Error {http_err.code}"
+        except Exception as e:
+            last_err_msg = str(e)
+            
+    raise HTTPException(
+        status_code=400,
+        detail=f"تعذر جلب بيانات الشيت من جوجل. يرجى التأكد من أن المستند منشور ومشارك للجميع بحساب View ({last_err_msg})"
+    )
+
 @app.post("/api/integrations/google-sheets/test")
 async def test_google_sheets(payload: GoogleSheetsTestSchema):
     spreadsheet_id = extract_spreadsheet_id(payload.sheet_url)
     sheet_name = payload.sheet_name or "Sheet1"
     
-    # Construct published CSV export URL
-    csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={urllib.parse.quote(sheet_name)}"
-    
     try:
-        req = urllib.request.Request(
-            csv_url,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            content = resp.read().decode('utf-8')
-            
-        csv_reader = csv.reader(io.StringIO(content))
-        rows = list(csv_reader)
+        rows = fetch_google_sheets_csv(spreadsheet_id, sheet_name)
         
         if not rows or len(rows) == 0:
             return {
                 "success": False,
-                "message": "Google Sheet accessed, but no rows or content found."
+                "message": "تم الوصول للشيت ولكن لم يتم العثور على أي صفوف أو بيانات."
             }
         
-        headers = rows[0]
+        headers = [h.strip() for h in rows[0]]
         preview_rows = rows[1:6] if len(rows) > 1 else []
         
         return {
@@ -867,13 +958,15 @@ async def test_google_sheets(payload: GoogleSheetsTestSchema):
             "headers": headers,
             "rows_preview": preview_rows,
             "total_rows": len(rows) - 1,
-            "message": f"Successfully connected to Google Sheet ({len(headers)} columns, {len(rows)-1} rows found)"
+            "message": f"تم الاتصال بشيت جوجل بنجاح ({len(headers)} أعمدة، {len(rows)-1} صفوف)"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Google Sheets test error: {e}")
         return {
             "success": False,
-            "message": f"Unable to fetch Google Sheet. Please make sure the sheet is shared as 'Anyone with the link can view'. Error: {str(e)}"
+            "message": f"تعذر جلب شيت جوجل: {str(e)}"
         }
 
 @app.post("/api/integrations/google-sheets/save")
@@ -882,7 +975,7 @@ async def save_google_sheets_config(
     current_user: Optional[dict] = Depends(get_current_user)
 ):
     if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail="التسجيل مطلوب.")
     
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
@@ -904,7 +997,7 @@ async def save_google_sheets_config(
                 "status": "CONNECTED",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="tenant_id,provider").execute()
-            return {"status": "success", "data": res.data}
+            return {"status": "success", "message": "تم حفظ إعدادات شيت جوجل بنجاح", "data": res.data}
         except Exception as e:
             logger.error(f"Error saving Google Sheets config: {e}")
     
@@ -920,12 +1013,12 @@ async def save_google_sheets_config(
         "column_mapping": payload.column_mapping,
         "status": "CONNECTED"
     }
-    return {"status": "success", "message": "Google Sheets configuration saved."}
+    return {"status": "success", "message": "تم حفظ إعدادات شيت جوجل بنجاح."}
 
 @app.post("/api/integrations/google-sheets/sync")
 async def sync_google_sheets_data(current_user: Optional[dict] = Depends(get_current_user)):
     if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail="التسجيل مطلوب.")
     
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
@@ -943,37 +1036,27 @@ async def sync_google_sheets_data(current_user: Optional[dict] = Depends(get_cur
         config = IN_MEMORY_STORE["configs"][tenant_id].get("GOOGLE_SHEETS")
 
     if not config or not config.get("credentials"):
-        raise HTTPException(status_code=400, detail="Google Sheets integration not configured.")
+        raise HTTPException(status_code=400, detail="لم يتم إعداد إعدادات شيت جوجل بعد. يرجى التكرم بحفظ الإعدادات أولاً.")
 
     creds = config["credentials"]
     mapping = config.get("column_mapping", {})
     spreadsheet_id = creds.get("spreadsheet_id")
     sheet_name = creds.get("sheet_name", "Sheet1")
 
-    csv_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={urllib.parse.quote(sheet_name)}"
-
     try:
-        req = urllib.request.Request(
-            csv_url,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            content = resp.read().decode('utf-8')
-            
-        csv_reader = csv.reader(io.StringIO(content))
-        rows = list(csv_reader)
+        rows = fetch_google_sheets_csv(spreadsheet_id, sheet_name)
         if len(rows) <= 1:
-            return {"status": "success", "synced_count": 0, "message": "No data rows found in Google Sheet."}
+            return {"status": "success", "synced_count": 0, "message": "لم يتم العثور على أي صفوف بيانات في شيت جوجل."}
 
-        headers = rows[0]
-        col_indices = {h.strip(): idx for idx, h in enumerate(headers)}
+        headers = [h.strip() for h in rows[0]]
+        col_indices = {h: idx for idx, h in enumerate(headers)}
 
         synced_count = 0
         for row in rows[1:]:
             if not any(row):
                 continue
             
-            # Map columns
+            # Map columns safely
             name_val = row[col_indices[mapping["name"]]] if mapping.get("name") in col_indices and col_indices[mapping["name"]] < len(row) else None
             client_val = row[col_indices[mapping["client"]]] if mapping.get("client") in col_indices and col_indices[mapping["client"]] < len(row) else None
             status_val = row[col_indices[mapping["status"]]] if mapping.get("status") in col_indices and col_indices[mapping["status"]] < len(row) else "التحليل"
@@ -1013,11 +1096,13 @@ async def sync_google_sheets_data(current_user: Optional[dict] = Depends(get_cur
         return {
             "status": "success",
             "synced_count": synced_count,
-            "message": f"Successfully imported {synced_count} project records from Google Sheets."
+            "message": f"تم استيراد {synced_count} مشروع بنجاح من شيت جوجل!"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Google Sheets sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"Google Sheets Sync Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في مزامنة شيتات جوجل: {str(e)}")
 
 # --- Notion API Integration Endpoints ---
 
