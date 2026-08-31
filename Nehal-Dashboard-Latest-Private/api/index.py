@@ -214,6 +214,25 @@ class GoogleSheetsSaveSchema(BaseModel):
     sheet_name: Optional[str] = "Sheet1"
     column_mapping: Dict[str, str] # e.g. {"name": "Col A", "status": "Col B"}
 
+class NotionTestSchema(BaseModel):
+    integration_token: str
+    database_id: str
+
+class NotionSaveSchema(BaseModel):
+    integration_token: str
+    database_id: str
+
+class SlackTestSchema(BaseModel):
+    webhook_url: str
+    channel_name: Optional[str] = "#general"
+
+class SlackSaveSchema(BaseModel):
+    webhook_url: str
+    channel_name: Optional[str] = "#general"
+
+class SlackNotifySchema(BaseModel):
+    message: str
+
 class WhatsAppIngestSchema(BaseModel):
     api_token: Optional[str] = None
     messages: List[Dict[str, Any]]
@@ -362,20 +381,33 @@ async def render_dashboard(request: Request):
     odoo_config = {}
     google_config = {}
     whatsapp_config = {}
-    if client and tenant_id:
-        try:
-            res = client.table("client_configs").select("*").eq("tenant_id", tenant_id).execute()
-            if res and res.data:
-                for row in res.data:
-                    prov = row.get("provider")
-                    if prov == "ODOO":
-                        odoo_config = row
-                    elif prov == "GOOGLE_SHEETS":
-                        google_config = row
-                    elif prov == "WHATSAPP":
-                        whatsapp_config = row
-        except Exception as e:
-            logger.error(f"Error fetching integration configs: {e}")
+    notion_config = {}
+    slack_config = {}
+    if tenant_id:
+        if client:
+            try:
+                res = client.table("client_configs").select("*").eq("tenant_id", tenant_id).execute()
+                if res and res.data:
+                    for row in res.data:
+                        prov = row.get("provider")
+                        if prov == "ODOO":
+                            odoo_config = row
+                        elif prov == "GOOGLE_SHEETS":
+                            google_config = row
+                        elif prov == "WHATSAPP":
+                            whatsapp_config = row
+                        elif prov == "NOTION":
+                            notion_config = row
+                        elif prov == "SLACK":
+                            slack_config = row
+            except Exception as e:
+                logger.error(f"Error fetching integration configs: {e}")
+        else:
+            odoo_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_ODOO", {})
+            google_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_GOOGLE_SHEETS", {})
+            whatsapp_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_WHATSAPP", {})
+            notion_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_NOTION", {})
+            slack_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_SLACK", {})
 
     return templates.TemplateResponse(
         request,
@@ -388,7 +420,9 @@ async def render_dashboard(request: Request):
             "supabase_connected": supabase_connected,
             "odoo_config": odoo_config,
             "google_config": google_config,
-            "whatsapp_config": whatsapp_config
+            "whatsapp_config": whatsapp_config,
+            "notion_config": notion_config,
+            "slack_config": slack_config
         }
     )
 
@@ -920,6 +954,274 @@ async def sync_google_sheets_data(current_user: Optional[dict] = Depends(get_cur
         logger.error(f"Google Sheets sync error: {e}")
         raise HTTPException(status_code=500, detail=f"Google Sheets Sync Error: {str(e)}")
 
+# --- Notion API Integration Endpoints ---
+
+@app.post("/api/integrations/notion/test")
+async def test_notion_connection(payload: NotionTestSchema, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    
+    token = payload.integration_token.strip()
+    db_id = payload.database_id.strip()
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": "2022-06-08",
+        "Content-Type": "application/json"
+    }
+    url = f"https://api.notion.com/v1/databases/{db_id}"
+    
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            title_parts = res_data.get("title", [])
+            title = title_parts[0].get("plain_text", "Notion Database") if title_parts else "Notion Database"
+            return {
+                "status": "success",
+                "connected": True,
+                "database_title": title,
+                "message": f"Successfully connected to Notion database '{title}'"
+            }
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8") if e.fp else str(e)
+        logger.error(f"Notion API error: {err_msg}")
+        raise HTTPException(status_code=400, detail=f"Notion API Error ({e.code}): Invalid token or database ID.")
+    except Exception as e:
+        logger.error(f"Notion connection error: {e}")
+        raise HTTPException(status_code=400, detail=f"Notion connection failed: {str(e)}")
+
+@app.post("/api/integrations/notion/save")
+async def save_notion_config(payload: NotionSaveSchema, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    
+    tenant_id = current_user.get("tenant_id")
+    client = get_supabase()
+    
+    encrypted_token = simple_encrypt(payload.integration_token)
+    config_record = {
+        "tenant_id": tenant_id,
+        "provider": "NOTION",
+        "encrypted_token": encrypted_token,
+        "config_json": {
+            "database_id": payload.database_id.strip()
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if client:
+        try:
+            client.table("client_configs").upsert(config_record, on_conflict="tenant_id,provider").execute()
+        except Exception as e:
+            logger.error(f"Error saving Notion config in Supabase: {e}")
+            
+    IN_MEMORY_STORE["client_configs"][f"{tenant_id}_NOTION"] = config_record
+    
+    return {
+        "status": "success",
+        "message": "Notion API configuration saved successfully."
+    }
+
+@app.post("/api/integrations/notion/sync")
+async def sync_notion_data(current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    
+    tenant_id = current_user.get("tenant_id")
+    client = get_supabase()
+    config = None
+    
+    if client:
+        try:
+            res = client.table("client_configs").select("*").eq("tenant_id", tenant_id).eq("provider", "NOTION").execute()
+            if res and res.data and len(res.data) > 0:
+                config = res.data[0]
+        except Exception as e:
+            logger.error(f"Error fetching Notion config: {e}")
+            
+    if not config and f"{tenant_id}_NOTION" in IN_MEMORY_STORE["client_configs"]:
+        config = IN_MEMORY_STORE["client_configs"][f"{tenant_id}_NOTION"]
+        
+    if not config:
+        raise HTTPException(status_code=400, detail="Notion integration is not configured.")
+        
+    token = simple_decrypt(config.get("encrypted_token", ""))
+    db_id = config.get("config_json", {}).get("database_id")
+    
+    if not token or not db_id:
+        raise HTTPException(status_code=400, detail="Invalid Notion configuration credentials.")
+        
+    url = f"https://api.notion.com/v1/databases/{db_id}/query"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": "2022-06-08",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        req = urllib.request.Request(url, data=json.dumps({}).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            results = res_data.get("results", [])
+            
+            synced_count = 0
+            for item in results:
+                props = item.get("properties", {})
+                title = "Notion Task"
+                for k, v in props.items():
+                    if v.get("type") == "title":
+                        title_parts = v.get("title", [])
+                        if title_parts:
+                            title = title_parts[0].get("plain_text", "Notion Task")
+                        break
+                        
+                project_data = {
+                    "tenant_id": tenant_id,
+                    "source": "NOTION",
+                    "source_id": f"notion_{item.get('id', '')[:8]}",
+                    "name": title,
+                    "client": "Notion Integration",
+                    "status": "التحليل",
+                    "priority": "MEDIUM",
+                    "progress": 25.0,
+                    "description": f"Imported from Notion page ID: {item.get('id')}"
+                }
+                
+                if client:
+                    try:
+                        client.table("projects").insert(project_data).execute()
+                        synced_count += 1
+                    except Exception as ex:
+                        logger.error(f"Error inserting Notion project: {ex}")
+                else:
+                    project_data["id"] = str(secrets.token_hex(16))
+                    project_data["created_at"] = datetime.now(timezone.utc).isoformat()
+                    IN_MEMORY_STORE["projects"].append(project_data)
+                    synced_count += 1
+                    
+            now_str = datetime.now(timezone.utc).isoformat()
+            if client:
+                client.table("client_configs").update({"last_synced_at": now_str}).eq("tenant_id", tenant_id).eq("provider", "NOTION").execute()
+                
+            return {
+                "status": "success",
+                "synced_count": synced_count,
+                "message": f"Successfully imported {synced_count} records from Notion."
+            }
+    except Exception as e:
+        logger.error(f"Notion sync error: {e}")
+        raise HTTPException(status_code=500, detail=f"Notion Sync Error: {str(e)}")
+
+# --- Slack Integration Endpoints ---
+
+@app.post("/api/integrations/slack/test")
+async def test_slack_webhook(payload: SlackTestSchema, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+        
+    webhook_url = payload.webhook_url.strip()
+    if not webhook_url.startswith("https://hooks.slack.com/"):
+        raise HTTPException(status_code=400, detail="Invalid Slack Webhook URL. URL must start with https://hooks.slack.com/")
+        
+    test_msg = {
+        "text": f"Slack Integration Verified! Connected to Nehal Command Center for workspace '{current_user.get('company_name')}'."
+    }
+    
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(test_msg).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_body = response.read().decode("utf-8")
+            if res_body.strip().lower() == "ok" or response.status == 200:
+                return {
+                    "status": "success",
+                    "connected": True,
+                    "message": "Slack webhook connection test succeeded! Test message delivered."
+                }
+            else:
+                raise HTTPException(status_code=400, detail=f"Slack returned unexpected response: {res_body}")
+    except Exception as e:
+        logger.error(f"Slack connection test error: {e}")
+        raise HTTPException(status_code=400, detail=f"Slack Connection Error: {str(e)}")
+
+@app.post("/api/integrations/slack/save")
+async def save_slack_config(payload: SlackSaveSchema, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+        
+    tenant_id = current_user.get("tenant_id")
+    client = get_supabase()
+    
+    encrypted_url = simple_encrypt(payload.webhook_url.strip())
+    config_record = {
+        "tenant_id": tenant_id,
+        "provider": "SLACK",
+        "encrypted_token": encrypted_url,
+        "config_json": {
+            "channel_name": payload.channel_name or "#general"
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if client:
+        try:
+            client.table("client_configs").upsert(config_record, on_conflict="tenant_id,provider").execute()
+        except Exception as e:
+            logger.error(f"Error saving Slack config in Supabase: {e}")
+            
+    IN_MEMORY_STORE["client_configs"][f"{tenant_id}_SLACK"] = config_record
+    
+    return {
+        "status": "success",
+        "message": "Slack webhook settings saved successfully."
+    }
+
+@app.post("/api/integrations/slack/notify")
+async def send_slack_notification(payload: SlackNotifySchema, current_user: Optional[dict] = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+        
+    tenant_id = current_user.get("tenant_id")
+    client = get_supabase()
+    config = None
+    
+    if client:
+        try:
+            res = client.table("client_configs").select("*").eq("tenant_id", tenant_id).eq("provider", "SLACK").execute()
+            if res and res.data and len(res.data) > 0:
+                config = res.data[0]
+        except Exception as e:
+            logger.error(f"Error fetching Slack config: {e}")
+            
+    if not config and f"{tenant_id}_SLACK" in IN_MEMORY_STORE["client_configs"]:
+        config = IN_MEMORY_STORE["client_configs"][f"{tenant_id}_SLACK"]
+        
+    if not config:
+        raise HTTPException(status_code=400, detail="Slack integration is not configured.")
+        
+    webhook_url = simple_decrypt(config.get("encrypted_token", ""))
+    if not webhook_url:
+        raise HTTPException(status_code=400, detail="Invalid Slack Webhook URL.")
+        
+    msg_data = {"text": payload.message}
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(msg_data).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return {"status": "success", "message": "Slack notification sent."}
+    except Exception as e:
+        logger.error(f"Error sending Slack notification: {e}")
+        raise HTTPException(status_code=500, detail=f"Slack notification error: {str(e)}")
+
 @app.post("/api/integrations/sync-all")
 async def sync_all_sources(current_user: Optional[dict] = Depends(get_current_user)):
     if not current_user:
@@ -929,6 +1231,7 @@ async def sync_all_sources(current_user: Optional[dict] = Depends(get_current_us
     results = {
         "odoo": {"status": "skipped", "message": "Not configured"},
         "google_sheets": {"status": "skipped", "message": "Not configured"},
+        "notion": {"status": "skipped", "message": "Not configured"},
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -945,6 +1248,13 @@ async def sync_all_sources(current_user: Optional[dict] = Depends(get_current_us
         results["google_sheets"] = {"status": "success", "synced_count": sheets_res.get("synced_count", 0)}
     except Exception as e:
         results["google_sheets"] = {"status": "error", "message": str(e)}
+
+    # Try Notion sync
+    try:
+        notion_res = await sync_notion_data(current_user)
+        results["notion"] = {"status": "success", "synced_count": notion_res.get("synced_count", 0)}
+    except Exception as e:
+        results["notion"] = {"status": "error", "message": str(e)}
 
     return {
         "status": "success",

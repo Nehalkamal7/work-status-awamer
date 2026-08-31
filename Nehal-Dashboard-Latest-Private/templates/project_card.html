@@ -1,4 +1,4 @@
-<div class="project-card glass-card rounded-3xl p-6 border-t-4 transition duration-300 hover:border-lime hover:shadow-xl hover:shadow-lime/5 relative overflow-hidden" 
+<div class="project-card glass-card rounded-2xl p-5 border-t-2 border-transparent transition duration-200 hover:border-lime hover:shadow-lg relative overflow-hidden" 
      data-id="{{ p.id }}"
      data-stage="{{ p.status }}"
      data-priority="{{ p.priority }}"
@@ -10,97 +10,118 @@
     <div class="flex justify-between items-start mb-3 gap-2">
         <div>
             <div class="flex items-center gap-2 flex-wrap mb-1.5">
-                <span class="px-2.5 py-0.5 text-[11px] font-black rounded-md bg-white/10 text-slate-300">
+                <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-500/10 text-slate-400 border border-slate-500/20">
                     {{ p.source_id or p.source or 'LOCAL' }}
                 </span>
                 <!-- Stage Pill -->
-                <span class="px-2.5 py-0.5 text-[11px] font-black rounded-md bg-lime/10 text-lime border border-lime/20">
-                    📌 Stage: {{ p.status or 'التحليل' }}
+                <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-md bg-lime/10 text-lime border border-lime/20 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    {{ p.status or 'التحليل' }}
                 </span>
             </div>
-            <h4 class="text-xl font-black text-white leading-snug">{{ p.name }}</h4>
-            <span class="text-xs text-slate-300 block mt-1">👤 العميل: <b class="text-slate-200">{{ p.client or 'غير محدد' }}</b></span>
+            <h4 class="text-lg font-extrabold text-main leading-snug">{{ p.name }}</h4>
+            <span class="text-xs text-subtle block mt-1 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                العميل: <b class="text-main font-semibold">{{ p.client or 'غير محدد' }}</b>
+            </span>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-            <button onclick="openModal('{{ p.id }}')" title="تعديل" class="px-3 py-1.5 text-xs font-bold bg-white/10 text-white rounded-xl hover:bg-lime hover:text-navy-900 transition flex items-center gap-1">
-                ✏️ تعديل
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="openModal('{{ p.id }}')" title="تعديل" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-500/10 text-main hover:bg-lime hover:text-navy-900 transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                تعديل
             </button>
-            <button onclick="deleteProject('{{ p.id }}')" title="حذف" class="px-3 py-1.5 text-xs font-bold bg-rust/10 text-rust rounded-xl hover:bg-rust hover:text-white transition flex items-center gap-1">
-                🗑️ حذف
+            <button onclick="deleteProject('{{ p.id }}')" title="حذف" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rust/10 text-rust hover:bg-rust hover:text-white transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                حذف
             </button>
         </div>
     </div>
 
     <!-- Metadata Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3.5">
         <!-- Deadline Box -->
-        <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block text-[11px] font-semibold">📅 موعد التسليم</span>
-            <b class="text-white mt-0.5 block font-bold text-xs truncate">
+        <div class="card-inner rounded-xl p-2.5">
+            <span class="text-subtle block text-[11px] font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                موعد التسليم
+            </span>
+            <b class="text-main mt-0.5 block font-bold text-xs truncate">
                 {{ p.deadline or 'غير محدد' }}
             </b>
         </div>
         <!-- Priority Box -->
-        <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block text-[11px] font-semibold">⚡ الأولوية</span>
-            <b class="mt-0.5 block font-black text-xs 
+        <div class="card-inner rounded-xl p-2.5">
+            <span class="text-subtle block text-[11px] font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
+                الأولوية
+            </span>
+            <b class="mt-0.5 block font-bold text-xs flex items-center gap-1
                 {% if p.priority == 'CRITICAL' %}text-rust
-                {% elif p.priority == 'HIGH' %}text-orange-400
-                {% elif p.priority == 'MEDIUM' %}text-sky-400
-                {% else %}text-slate-300{% endif %}">
-                {% if p.priority == 'CRITICAL' %}🚨 حرج
-                {% elif p.priority == 'HIGH' %}🔥 عالي
-                {% elif p.priority == 'MEDIUM' %}⚡ متوسط
-                {% else %}☕ منخفض{% endif %}
+                {% elif p.priority == 'HIGH' %}text-amber-500
+                {% elif p.priority == 'MEDIUM' %}text-sky-500
+                {% else %}text-slate-400{% endif %}">
+                <span class="w-1.5 h-1.5 rounded-full {% if p.priority == 'CRITICAL' %}bg-rust{% elif p.priority == 'HIGH' %}bg-amber-500{% elif p.priority == 'MEDIUM' %}bg-sky-500{% else %}bg-slate-400{% endif %}"></span>
+                {% if p.priority == 'CRITICAL' %}حرج (Critical)
+                {% elif p.priority == 'HIGH' %}عالي (High)
+                {% elif p.priority == 'MEDIUM' %}متوسط (Medium)
+                {% else %}منخفض (Low){% endif %}
             </b>
         </div>
         <!-- Progress Box -->
-        <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block text-[11px] font-semibold">📊 نسبة الإنجاز</span>
-            <b class="mt-0.5 block font-black text-xs
-                {% if p.progress >= 100 %}text-sky-400
+        <div class="card-inner rounded-xl p-2.5">
+            <span class="text-subtle block text-[11px] font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+                نسبة الإنجاز
+            </span>
+            <b class="mt-0.5 block font-bold text-xs
+                {% if p.progress >= 100 %}text-sky-500
                 {% elif p.progress >= 70 %}text-lime
-                {% elif p.progress >= 30 %}text-amber-400
+                {% elif p.progress >= 30 %}text-amber-500
                 {% else %}text-rust{% endif %}">
                 {{ p.progress }}%
             </b>
         </div>
         <!-- Assigned To Box -->
-        <div class="glass-card rounded-xl p-2.5">
-            <span class="text-slate-400 block text-[11px] font-semibold">🎯 المسؤول</span>
-            <b class="text-white mt-0.5 block font-bold text-xs truncate">{{ p.assigned_to or 'غير محدد' }}</b>
+        <div class="card-inner rounded-xl p-2.5">
+            <span class="text-subtle block text-[11px] font-semibold flex items-center gap-1">
+                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                المسؤول
+            </span>
+            <b class="text-main mt-0.5 block font-bold text-xs truncate">{{ p.assigned_to or 'غير محدد' }}</b>
         </div>
     </div>
 
     <!-- Progress Bar -->
-    <div class="w-full bg-navy-900/80 rounded-full h-2.5 mb-4 overflow-hidden p-0.5 border border-white/5">
-        <div class="h-1.5 rounded-full transition-all duration-500
-            {% if p.progress >= 100 %}bg-gradient-to-r from-sky-400 to-blue-500
-            {% elif p.progress >= 70 %}bg-gradient-to-r from-lime to-emerald-400
-            {% elif p.progress >= 30 %}bg-gradient-to-r from-amber-400 to-yellow-500
-            {% else %}bg-gradient-to-r from-rust to-red-600{% endif %}" 
+    <div class="w-full bg-slate-500/10 rounded-full h-2 mb-3.5 overflow-hidden p-0.5">
+        <div class="h-1 rounded-full transition-all duration-500
+            {% if p.progress >= 100 %}bg-sky-500
+            {% elif p.progress >= 70 %}bg-lime
+            {% elif p.progress >= 30 %}bg-amber-500
+            {% else %}bg-rust{% endif %}" 
             style="width: {{ p.progress }}%">
         </div>
     </div>
 
     <!-- Daily Report Box -->
-    <div class="bg-navy-900/90 rounded-2xl p-3.5 border-r-4 {% if p.daily_report and p.daily_report.strip() %}border-lime{% else %}border-slate-600{% endif %}">
+    <div class="card-inner rounded-xl p-3 border-r-2 {% if p.daily_report and p.daily_report.strip() %}border-lime{% else %}border-slate-500/30{% endif %}">
         <div class="flex items-center justify-between">
-            <span class="text-xs font-black text-lime flex items-center gap-1">
-                📝 التقرير اليومي:
+            <span class="text-xs font-bold text-main flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                التقرير اليومي
             </span>
             {% if p.daily_report and p.daily_report.strip() %}
-            <span class="text-[10px] text-lime/80 bg-lime/10 px-2 py-0.5 rounded-full">مُحدث</span>
+            <span class="text-[10px] text-lime font-semibold bg-lime/10 px-2 py-0.5 rounded-full">مُحدث</span>
             {% endif %}
         </div>
-        <p class="text-xs text-slate-300 mt-1.5 whitespace-pre-wrap leading-relaxed">
+        <p class="text-xs text-subtle mt-1.5 whitespace-pre-wrap leading-relaxed">
             {{ p.daily_report or 'لم يُكتب تقرير اليوم بعد.' }}
         </p>
     </div>
 
     {% if p.description and p.description.strip() %}
-    <div class="mt-3 text-xs text-slate-400 bg-navy-800/40 p-2.5 rounded-xl border border-white/5">
-        <span class="font-bold text-slate-300">💡 ملاحظات:</span> {{ p.description }}
+    <div class="mt-2.5 text-xs text-subtle card-inner p-2.5 rounded-xl border border-slate-500/10 flex items-start gap-1.5">
+        <svg class="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span><b class="text-main">ملاحظات:</b> {{ p.description }}</span>
     </div>
     {% endif %}
 </div>
