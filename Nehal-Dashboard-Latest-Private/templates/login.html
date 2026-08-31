@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول | Nehal Command Center & Client Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { cairo: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        navy: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
+                        lime: '#a3e635',
+                        rust: '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <!-- Background Glows -->
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-lime/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-md glass-card rounded-3xl p-8 shadow-2xl relative z-10 border border-white/10">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-lime/10 text-lime text-3xl font-black mb-4 border border-lime/20 shadow-lg shadow-lime/10">
+                ⚡
+            </div>
+            <h1 class="text-2xl font-black text-white tracking-tight">بوابة المشاريع والتكاملات</h1>
+            <p class="text-xs text-slate-400 mt-2">تسجيل الدخول للمساحة المعزولة والتحكم في التكاملات</p>
+        </div>
+
+        <!-- Form Switcher Tabs -->
+        <div class="flex bg-navy-900/80 p-1.5 rounded-xl mb-6 border border-white/5">
+            <button id="tabLoginBtn" onclick="showTab('login')" class="flex-1 py-2 rounded-lg text-xs font-bold transition text-navy-900 bg-lime shadow-md">
+                تسجيل الدخول
+            </button>
+            <button id="tabRegisterBtn" onclick="showTab('register')" class="flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+                إنشاء حساب جديد
+            </button>
+        </div>
+
+        <!-- Alert Notification Box -->
+        <div id="alertBox" class="hidden mb-4 p-3 rounded-xl text-xs font-bold border"></div>
+
+        <!-- Login Form -->
+        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">البريد الإلكتروني</label>
+                <input type="email" id="loginEmail" required placeholder="demo@example.com"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">كلمة المرور</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <button type="submit" id="loginBtn" class="w-full rounded-xl bg-lime py-3.5 font-black text-navy-900 shadow-lg shadow-lime/20 hover:bg-lime/90 active:scale-[0.98] transition text-sm">
+                دخول إلى لوحة التحكم
+            </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">الاسم الكامل</label>
+                <input type="text" id="regName" required placeholder="نهال كمال"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">اسم الشركة / المؤسسة</label>
+                <input type="text" id="regCompany" required placeholder="أوامر للحلول البرمجية"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">البريد الإلكتروني</label>
+                <input type="email" id="regEmail" required placeholder="nehal@example.com"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">كلمة المرور</label>
+                <input type="password" id="regPassword" required placeholder="••••••••"
+                    class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">نوع الحساب</label>
+                <select id="regRole" class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-lime transition cursor-pointer">
+                    <option value="CLIENT">عميل (مساحة خاصة معزولة)</option>
+                    <option value="ADMIN">مدير النظام (Admin Workspace)</option>
+                </select>
+            </div>
+
+            <button type="submit" id="regBtn" class="w-full rounded-xl bg-lime py-3.5 font-black text-navy-900 shadow-lg shadow-lime/20 hover:bg-lime/90 active:scale-[0.98] transition text-sm">
+                إنشاء المساحة والبدء
+            </button>
+        </form>
+
+        <div class="mt-6 pt-4 border-t border-white/5 text-center text-xs text-slate-500">
+            نظام متابعة وتكامل المشاريع · الإصدار 2.5
+        </div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const regForm = document.getElementById('registerForm');
+            const tabLoginBtn = document.getElementById('tabLoginBtn');
+            const tabRegBtn = document.getElementById('tabRegisterBtn');
+            const alertBox = document.getElementById('alertBox');
+            alertBox.classList.add('hidden');
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                regForm.classList.add('hidden');
+                tabLoginBtn.className = "flex-1 py-2 rounded-lg text-xs font-bold transition text-navy-900 bg-lime shadow-md";
+                tabRegBtn.className = "flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+            } else {
+                loginForm.classList.add('hidden');
+                regForm.classList.remove('hidden');
+                tabRegBtn.className = "flex-1 py-2 rounded-lg text-xs font-bold transition text-navy-900 bg-lime shadow-md";
+                tabLoginBtn.className = "flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+            }
+        }
+
+        function showAlert(msg, isSuccess = false) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.classList.remove('hidden', 'bg-rust/20', 'text-rust', 'border-rust/30', 'bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/30');
+            if (isSuccess) {
+                alertBox.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/30');
+            } else {
+                alertBox.classList.add('bg-rust/20', 'text-rust', 'border-rust/30');
+            }
+            alertBox.innerText = msg;
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerText = "جاري التحقق...";
+
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    showAlert('تم تسجيل الدخول بنجاح! جاري التوجيه...', true);
+                    setTimeout(() => window.location.href = '/', 600);
+                } else {
+                    showAlert(data.detail || 'تعذر تسجيل الدخول. تحقق من البيانات المدخلة.');
+                }
+            } catch (err) {
+                showAlert('حدث خطأ في الاتصال بالخادم.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "دخول إلى لوحة التحكم";
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('regBtn');
+            btn.disabled = true;
+            btn.innerText = "جاري إنشاء الحساب...";
+
+            const name = document.getElementById('regName').value;
+            const company_name = document.getElementById('regCompany').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const role = document.getElementById('regRole').value;
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, company_name, email, password, role })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    showAlert('تم إنشاء المساحة بنجاح! جاري التوجيه...', true);
+                    setTimeout(() => window.location.href = '/', 600);
+                } else {
+                    showAlert(data.detail || 'تعذر إنشاء الحساب.');
+                }
+            } catch (err) {
+                showAlert('حدث خطأ في الاتصال بالخادم.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "إنشاء المساحة والبدء";
+            }
+        }
+    </script>
+</body>
+</html>

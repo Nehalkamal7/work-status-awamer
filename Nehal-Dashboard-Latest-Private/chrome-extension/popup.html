@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WhatsApp Web Scraper</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="brand">
+                <span class="logo">⚡</span>
+                <div>
+                    <h2>WhatsApp Web Sync</h2>
+                    <p class="subtitle">Nehal Dashboard Extension</p>
+                </div>
+            </div>
+            <div id="statusBadge" class="status-badge badge-off">OFF</div>
+        </header>
+
+        <!-- Master Toggle Card -->
+        <div class="toggle-card">
+            <div class="toggle-info">
+                <span class="toggle-title">Active DOM Observer</span>
+                <span class="toggle-desc">Scrape & sync chat messages in real time</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="scrapeToggle">
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <!-- Configuration Inputs -->
+        <div class="form-section">
+            <label class="form-label">Dashboard API URL</label>
+            <input type="url" id="dashboardUrl" placeholder="http://localhost:8000" class="input-field">
+
+            <label class="form-label">Client API Token</label>
+            <input type="text" id="apiToken" placeholder="wh_tok_..." class="input-field font-mono">
+
+            <label class="form-label">Target Group Name Filter (Optional)</label>
+            <input type="text" id="targetGroup" placeholder="e.g. Support Group" class="input-field">
+
+            <button id="saveConfigBtn" class="btn primary-btn">Save Settings</button>
+        </div>
+
+        <!-- Statistics & Counter -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Synced Messages</span>
+                <b id="totalCount" class="stat-val">0</b>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Last Sync</span>
+                <b id="lastSync" class="stat-val text-sm">--:--</b>
+            </div>
+        </div>
+
+        <!-- Activity Logs -->
+        <div class="logs-section">
+            <div class="logs-header">
+                <span>Sync Activity Logs</span>
+                <button id="clearLogsBtn" class="btn-text">Clear</button>
+            </div>
+            <div id="logsContainer" class="logs-box">
+                <div class="log-empty">No sync logs recorded yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة متابعة مشاريعي | Command Center</title>
+    <title>لوحة التحكم والتكاملات | Command Center</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -29,165 +29,444 @@
         .glass-card-interactive:hover { transform: translateY(-2px); border-color: rgba(163, 230, 53, 0.4); }
         .modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); }
         .modal.active { display: flex; }
-        /* Toast Animation */
         @keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-animate { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .tab-btn.active { background-color: #a3e635; color: #0f172a; font-weight: 900; }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen relative pb-16">
     <div class="max-w-7xl mx-auto">
         
-        <!-- Header Banner -->
-        <header class="mb-8 rounded-3xl bg-gradient-to-r from-navy-800 via-navy-900 to-slate-900 p-6 md:p-8 border border-white/10 shadow-2xl relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-96 h-96 bg-lime/5 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <!-- Top Multi-Tenant Navbar & User Status -->
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4 glass-card p-4 rounded-2xl border border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-lime/10 border border-lime/20 flex items-center justify-center text-lime font-black text-xl shadow-lg shadow-lime/10">
+                    ⚡
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-black text-white">{{ user.company_name or 'المساحة الشخصية' }}</h2>
+                        <span class="px-2 py-0.5 text-[10px] font-black rounded-full {{ 'bg-purple-500/20 text-purple-300 border border-purple-500/30' if user.role == 'ADMIN' else 'bg-sky-500/20 text-sky-300 border border-sky-500/30' }}">
+                            {{ user.role }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">مرحباً {{ user.name }} ({{ user.email }})</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-lime bg-lime/10 border border-lime/20 rounded-full shadow-lg shadow-lime/10" id="liveSyncBadge" title="المزامنة المباشرة تعمل تلقائياً كل 60 ثانية">
+                    <span class="w-2 h-2 rounded-full bg-lime animate-ping"></span> تحديث مباشر (كل دقيقة)
+                </span>
                 {% if supabase_connected %}
-                <span class="inline-flex items-center gap-2 px-3.5 py-1 text-xs font-black text-lime bg-lime/10 border border-lime/20 rounded-full">
-                    <span class="w-2 h-2 rounded-full bg-lime animate-pulse"></span>
-                    متصل بـ Supabase · مساحة نهال الخاصّة
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-lime bg-lime/10 border border-lime/20 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-lime animate-pulse"></span> Supabase متصل
                 </span>
                 {% else %}
-                <span class="inline-flex items-center gap-2 px-3.5 py-1 text-xs font-black text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full">
-                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                    وضع العرض المحلي (Supabase غير متصل)
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span> العرض المحلي
                 </span>
                 {% endif %}
-                <span class="text-xs text-slate-400 font-bold">Vercel Serverless + FastAPI</span>
-            </div>
-
-            <div class="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight">لوحة متابعة مشاريعي (Command Center)</h1>
-                    <p class="mt-2 text-slate-400 text-sm md:text-base leading-relaxed">
-                        تابع حالة المشاريع، المراحل، التواريخ، والتقرير اليومي مباشرة وبسرعة فائقة.
-                    </p>
-                </div>
-                <button onclick="openModal()" class="rounded-xl bg-lime px-6 py-3.5 font-black text-navy-900 shadow-lg shadow-lime/20 hover:bg-lime/90 hover:scale-[1.02] active:scale-[0.98] transition flex items-center gap-2 text-sm">
-                    <span class="text-lg">+</span> إضافة مشروع جديد
+                <button onclick="handleLogout()" class="px-4 py-2 rounded-xl border border-rust/30 bg-rust/10 text-rust text-xs font-bold hover:bg-rust/20 transition">
+                    تسجيل الخروج
                 </button>
             </div>
+        </div>
 
-            <!-- Interactive KPI Metrics -->
-            <div class="mt-8 grid gap-3 grid-cols-2 md:grid-cols-5">
-                <!-- Total -->
-                <div onclick="setKpiFilter('ALL')" class="glass-card glass-card-interactive rounded-2xl p-4 border-lime/20" id="kpiCardAll">
-                    <span class="text-xs text-slate-400 font-semibold block">إجمالي المشاريع</span>
-                    <b class="text-3xl font-black text-white mt-1 block">{{ kpis.total_projects }}</b>
-                    <span class="text-[10px] text-slate-400 block mt-1">اضغطي لعرض الكل</span>
+        <!-- Navigation Tabs Bar -->
+        <div class="mb-6 flex flex-wrap gap-2 bg-navy-900/90 p-2 rounded-2xl border border-white/10 shadow-xl">
+            <button id="navTabProjects" onclick="switchMainTab('projects')" class="tab-btn active flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                <span>📁</span> المشاريع والمهام
+            </button>
+            <button id="navTabOdoo" onclick="switchMainTab('odoo')" class="tab-btn flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <span>🏢</span> بيانات Odoo ERP
+            </button>
+            <button id="navTabSheets" onclick="switchMainTab('sheets')" class="tab-btn flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <span>📊</span> شيتات جوجل
+            </button>
+            <button id="navTabWhatsapp" onclick="switchMainTab('whatsapp')" class="tab-btn flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <span>💬</span> مراقبة واتساب
+            </button>
+            <button id="navTabSettings" onclick="switchMainTab('settings')" class="tab-btn flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <span>⚙️</span> الإعدادات والتكاملات
+            </button>
+        </div>
+
+        <!-- ================= TAB 1: PROJECTS & DASHBOARD HOME ================= -->
+        <div id="viewProjects" class="view-panel">
+            <!-- Header Banner -->
+            <header class="mb-8 rounded-3xl bg-gradient-to-r from-navy-800 via-navy-900 to-slate-900 p-6 md:p-8 border border-white/10 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-96 h-96 bg-lime/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight">لوحة متابعة المشاريع (Command Center)</h1>
+                        <p class="mt-2 text-slate-400 text-sm md:text-base leading-relaxed">
+                            تابع حالة المشاريع، المراحل، التواريخ، والتقرير اليومي مباشرة وبسرعة فائقة.
+                        </p>
+                    </div>
+                    <button onclick="openModal()" class="rounded-xl bg-lime px-6 py-3.5 font-black text-navy-900 shadow-lg shadow-lime/20 hover:bg-lime/90 hover:scale-[1.02] active:scale-[0.98] transition flex items-center gap-2 text-sm">
+                        <span class="text-lg">+</span> إضافة مشروع جديد
+                    </button>
                 </div>
-                <!-- Urgent -->
-                <div onclick="setKpiFilter('URGENT')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-rust/40" id="kpiCardUrgent">
-                    <span class="text-xs text-slate-400 font-semibold block">أولوية عاجلة🔥</span>
-                    <b class="text-3xl font-black text-rust mt-1 block">{{ kpis.urgent_projects }}</b>
-                    <span class="text-[10px] text-rust/80 block mt-1">اضغطي للتصفية</span>
+
+                <!-- KPI Metrics -->
+                <div class="mt-8 grid gap-3 grid-cols-2 md:grid-cols-5">
+                    <div onclick="setKpiFilter('ALL')" class="glass-card glass-card-interactive rounded-2xl p-4 border-lime/20" id="kpiCardAll">
+                        <span class="text-xs text-slate-400 font-semibold block">إجمالي المشاريع</span>
+                        <b class="text-3xl font-black text-white mt-1 block">{{ kpis.total_projects }}</b>
+                        <span class="text-[10px] text-slate-400 block mt-1">عرض الكل</span>
+                    </div>
+                    <div onclick="setKpiFilter('URGENT')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-rust/40" id="kpiCardUrgent">
+                        <span class="text-xs text-slate-400 font-semibold block">أولوية عاجلة🔥</span>
+                        <b class="text-3xl font-black text-rust mt-1 block">{{ kpis.urgent_projects }}</b>
+                        <span class="text-[10px] text-rust/80 block mt-1">تصفية العاجل</span>
+                    </div>
+                    <div onclick="setKpiFilter('COMPLETED')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-sky-400/40" id="kpiCardCompleted">
+                        <span class="text-xs text-slate-400 font-semibold block">مكتملة 🎉</span>
+                        <b class="text-3xl font-black text-sky-400 mt-1 block">{{ kpis.completed_projects }}</b>
+                        <span class="text-[10px] text-sky-400/80 block mt-1">تصفية المكتمل</span>
+                    </div>
+                    <div onclick="setKpiFilter('REPORT')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-lime/40" id="kpiCardReport">
+                        <span class="text-xs text-slate-400 font-semibold block">تقرير يومي 📝</span>
+                        <b class="text-3xl font-black text-lime mt-1 block">{{ kpis.has_daily_report }}</b>
+                        <span class="text-[10px] text-lime/80 block mt-1">تصفية التقارير</span>
+                    </div>
+                    <div class="glass-card rounded-2xl p-4">
+                        <span class="text-xs text-slate-400 font-semibold block">متوسط الإنجاز</span>
+                        <b class="text-3xl font-black text-emerald-400 mt-1 block">{{ kpis.avg_progress }}%</b>
+                        <span class="text-[10px] text-slate-400 block mt-1">المعدل العام</span>
+                    </div>
                 </div>
-                <!-- Completed -->
-                <div onclick="setKpiFilter('COMPLETED')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-sky-400/40" id="kpiCardCompleted">
-                    <span class="text-xs text-slate-400 font-semibold block">مكتملة 🎉</span>
-                    <b class="text-3xl font-black text-sky-400 mt-1 block">{{ kpis.completed_projects }}</b>
-                    <span class="text-[10px] text-sky-400/80 block mt-1">اضغطي للتصفية</span>
+            </header>
+
+            <!-- Filters & Search Bar -->
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-4 glass-card p-4 rounded-2xl">
+                <div class="flex items-center gap-3">
+                    <span class="p-2 rounded-xl bg-lime/10 text-lime font-black">🔍</span>
+                    <div>
+                        <h2 class="text-lg font-black text-white" id="filterTitle">جميع المشاريع</h2>
+                        <p class="text-xs text-slate-400" id="filterSubtitle">تصفية بحسب الاسم أو العميل أو المرحلة</p>
+                    </div>
                 </div>
-                <!-- Has Report -->
-                <div onclick="setKpiFilter('REPORT')" class="glass-card glass-card-interactive rounded-2xl p-4 hover:border-lime/40" id="kpiCardReport">
-                    <span class="text-xs text-slate-400 font-semibold block">تقرير يومي 📝</span>
-                    <b class="text-3xl font-black text-lime mt-1 block">{{ kpis.has_daily_report }}</b>
-                    <span class="text-[10px] text-lime/80 block mt-1">اضغطي للتصفية</span>
-                </div>
-                <!-- Avg Progress -->
-                <div class="glass-card rounded-2xl p-4">
-                    <span class="text-xs text-slate-400 font-semibold block">متوسط الإنجاز</span>
-                    <b class="text-3xl font-black text-emerald-400 mt-1 block">{{ kpis.avg_progress }}%</b>
-                    <span class="text-[10px] text-slate-400 block mt-1">المعدل العام</span>
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <input id="searchInput" oninput="filterProjects()" type="text" placeholder="ابحثي باسم المشروع أو العميل..." 
+                        class="w-full md:w-72 rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
+                    
+                    <select id="stageSelect" onchange="filterProjects()" class="rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-lime transition cursor-pointer">
+                        <option value="ALL">كل المراحل</option>
+                        {% for stage in stages %}
+                        <option value="{{ stage }}">{{ stage }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <select id="prioritySelect" onchange="filterProjects()" class="rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-lime transition cursor-pointer">
+                        <option value="ALL">كل الأولويات</option>
+                        <option value="CRITICAL">حرج (CRITICAL)</option>
+                        <option value="HIGH">عالي (HIGH)</option>
+                        <option value="MEDIUM">متوسط (MEDIUM)</option>
+                        <option value="LOW">منخفض (LOW)</option>
+                    </select>
+
+                    <button onclick="resetFilters()" class="p-3 rounded-xl border border-white/10 bg-navy-800 text-xs font-bold text-slate-300 hover:text-white hover:border-white/20 transition">
+                        إعادة ضبط
+                    </button>
                 </div>
             </div>
-        </header>
 
-        <!-- Filters & Search Bar -->
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-4 glass-card p-4 rounded-2xl">
-            <div class="flex items-center gap-3">
-                <span class="p-2 rounded-xl bg-lime/10 text-lime font-black">🔍</span>
-                <div>
-                    <h2 class="text-lg font-black text-white" id="filterTitle">جميع المشاريع</h2>
-                    <p class="text-xs text-slate-400" id="filterSubtitle">تصفية وحسب الكود أو العميل أو المرحلة</p>
-                </div>
+            {% if not projects %}
+            <div class="glass-card rounded-3xl p-12 text-center text-slate-400">
+                <div class="text-5xl mb-4">🚀</div>
+                <h3 class="text-xl font-bold text-white mb-2">لا توجد مشاريع حتى الآن</h3>
+                <p class="text-sm text-slate-400 mb-6 max-w-md mx-auto">ابدئي بإضافة مشروعك الأول أو استيراد المشاريع عبر شيتات جوجل أو Odoo.</p>
+                <button onclick="openModal()" class="rounded-xl bg-lime px-6 py-3 font-black text-navy-900 hover:bg-lime/90 transition inline-flex items-center gap-2">
+                    + إضافة مشروع جديد
+                </button>
             </div>
-            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <input id="searchInput" oninput="filterProjects()" type="text" placeholder="ابحثي باسم المشروع، العميل، أو الكود..." 
-                    class="w-full md:w-72 rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime transition">
-                
-                <select id="stageSelect" onchange="filterProjects()" class="rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-lime transition cursor-pointer">
-                    <option value="ALL">كل المراحل</option>
-                    {% for stage in stages %}
-                    <option value="{{ stage }}">{{ stage }}</option>
+            {% else %}
+            
+            <section id="urgentSection" class="mb-10">
+                <h3 class="text-xl font-black text-rust mb-4 flex items-center gap-2">
+                    🔥 الأهم أولًا - أولوية ومتابعة عاجلة
+                </h3>
+                <div class="grid gap-4 md:grid-cols-2">
+                    {% for p in projects %}
+                    {% if p.priority in ['CRITICAL', 'HIGH'] %}
+                    {% include 'project_card.html' %}
+                    {% endif %}
                     {% endfor %}
-                </select>
+                </div>
+            </section>
 
-                <select id="prioritySelect" onchange="filterProjects()" class="rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-lime transition cursor-pointer">
-                    <option value="ALL">كل الأولويات</option>
-                    <option value="CRITICAL">حرج (CRITICAL)</option>
-                    <option value="HIGH">عالي (HIGH)</option>
-                    <option value="MEDIUM">متوسط (MEDIUM)</option>
-                    <option value="LOW">منخفض (LOW)</option>
-                </select>
+            <section id="stableSection">
+                <div class="border-t border-white/10 pt-8 mb-4">
+                    <p class="text-xs font-black tracking-wider text-slate-400">المتابعة الدورية</p>
+                    <h3 class="text-2xl font-black text-white mt-1">المشاريع حسب المرحلة والأولوية</h3>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                    {% for p in projects %}
+                    {% if p.priority not in ['CRITICAL', 'HIGH'] %}
+                    {% include 'project_card.html' %}
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
 
-                <button onclick="resetFilters()" class="p-3 rounded-xl border border-white/10 bg-navy-800 text-xs font-bold text-slate-300 hover:text-white hover:border-white/20 transition">
-                    إعادة ضبط
+            <div id="emptyResultsState" class="hidden glass-card rounded-3xl p-12 text-center text-slate-400 my-8">
+                <div class="text-4xl mb-3">🔍</div>
+                <h4 class="text-lg font-bold text-white mb-1">لا توجد مشاريع تطابق خيارات البحث</h4>
+                <button onclick="resetFilters()" class="mt-4 px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition">
+                    إعادة ضبط البحث
                 </button>
             </div>
+            {% endif %}
         </div>
 
-        {% if not projects %}
-        <div class="glass-card rounded-3xl p-12 text-center text-slate-400">
-            <div class="text-5xl mb-4">🚀</div>
-            <h3 class="text-xl font-bold text-white mb-2">لا توجد مشاريع حتى الآن</h3>
-            <p class="text-sm text-slate-400 mb-6 max-w-md mx-auto">ابدئي بإضافة مشروعك الأول لمتابعة مراحل العمل والتقارير اليومية مباشرة.</p>
-            <button onclick="openModal()" class="rounded-xl bg-lime px-6 py-3 font-black text-navy-900 hover:bg-lime/90 transition inline-flex items-center gap-2">
-                + إضافة مشروع جديد
-            </button>
-        </div>
-        {% else %}
-        
-        <!-- Urgent Projects Section -->
-        <section id="urgentSection" class="mb-10">
-            <h3 class="text-xl font-black text-rust mb-4 flex items-center gap-2">
-                🔥 الأهم أولًا - أولوية ومتابعة عاجلة
-            </h3>
-            <div class="grid gap-4 md:grid-cols-2">
-                {% for p in projects %}
-                {% if p.priority in ['CRITICAL', 'HIGH'] %}
-                {% include 'project_card.html' %}
-                {% endif %}
-                {% endfor %}
-            </div>
-        </section>
+        <!-- ================= TAB 2: ODOO DATA VIEW ================= -->
+        <div id="viewOdoo" class="view-panel hidden">
+            <div class="glass-card rounded-3xl p-6 md:p-8">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <span class="p-3 rounded-2xl bg-purple-500/10 text-purple-400 text-2xl font-black">🏢</span>
+                        <div>
+                            <h2 class="text-2xl font-black text-white">بيانات نظام Odoo ERP المزامنة</h2>
+                            <p class="text-xs text-slate-400">عرض أحدث الطلبات والعملاء والسجلات المجلوبة عبر XML-RPC API</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerOdooSync()" class="px-5 py-3 rounded-xl bg-purple-500 text-white font-bold text-xs hover:bg-purple-600 transition flex items-center gap-2 shadow-lg shadow-purple-500/20">
+                        ⚡ مزامنة Odoo فوراً
+                    </button>
+                </div>
 
-        <!-- Regular Projects Section -->
-        <section id="stableSection">
-            <div class="border-t border-white/10 pt-8 mb-4">
-                <p class="text-xs font-black tracking-wider text-slate-400">المتابعة الدورية</p>
-                <h3 class="text-2xl font-black text-white mt-1">المشاريع حسب المرحلة والأولوية</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-navy-900/90 text-xs font-bold text-slate-400 border-b border-white/10">
+                            <tr>
+                                <th class="p-3.5">معرف Odoo ID</th>
+                                <th class="p-3.5">اسم السجل / الطلب</th>
+                                <th class="p-3.5">النموذج (Model)</th>
+                                <th class="p-3.5">تاريخ المزامنة</th>
+                                <th class="p-3.5">تفاصيل السجل</th>
+                            </tr>
+                        </thead>
+                        <tbody id="odooRecordsTableBody" class="divide-y divide-white/5 text-slate-300">
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-slate-500">جاري تحميل سجلات Odoo...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="grid gap-4 md:grid-cols-2">
-                {% for p in projects %}
-                {% if p.priority not in ['CRITICAL', 'HIGH'] %}
-                {% include 'project_card.html' %}
-                {% endif %}
-                {% endfor %}
-            </div>
-        </section>
-
-        <!-- Empty Search Results Placeholder -->
-        <div id="emptyResultsState" class="hidden glass-card rounded-3xl p-12 text-center text-slate-400 my-8">
-            <div class="text-4xl mb-3">🔍</div>
-            <h4 class="text-lg font-bold text-white mb-1">لا توجد مشاريع تطابق خيارات البحث</h4>
-            <p class="text-xs text-slate-400 mb-4">جربي البحث بكلمات أخرى أو قم بإعادة ضبط الفلاتر.</p>
-            <button onclick="resetFilters()" class="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition">
-                إعادة ضبط البحث
-            </button>
         </div>
 
-        {% endif %}
+        <!-- ================= TAB 3: GOOGLE SHEETS DATA VIEW ================= -->
+        <div id="viewSheets" class="view-panel hidden">
+            <div class="glass-card rounded-3xl p-6 md:p-8">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <span class="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 text-2xl font-black">📊</span>
+                        <div>
+                            <h2 class="text-2xl font-black text-white">المشاريع المجلوبة من Google Sheets</h2>
+                            <p class="text-xs text-slate-400">الربط المباشر المحدث دورياً مع جدول البيانات الخاص بك</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerSheetsSync()" class="px-5 py-3 rounded-xl bg-emerald-500 text-navy-900 font-black text-xs hover:bg-emerald-400 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                        🔄 تحديث واستيراد من Google Sheets
+                    </button>
+                </div>
+
+                <div id="sheetsSyncStatusBox" class="mb-4 p-4 rounded-2xl bg-navy-900/80 border border-white/10 text-xs text-slate-300">
+                    انقري على "تحديث واستيراد" لمزامنة البيانات الجديدة وتحديث القائمة فوراً.
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 4: WHATSAPP MONITOR ================= -->
+        <div id="viewWhatsapp" class="view-panel hidden">
+            <div class="glass-card rounded-3xl p-6 md:p-8">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <span class="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 text-2xl font-black">💬</span>
+                        <div>
+                            <h2 class="text-2xl font-black text-white">مراقبة الرسائل المجلوبة من WhatsApp Web</h2>
+                            <p class="text-xs text-slate-400">الرسائل المجلوبة تلقائياً بواسطة إضافة Chrome Extension المخصصة</p>
+                        </div>
+                    </div>
+                    <button onclick="loadWhatsappMessages()" class="px-4 py-2.5 rounded-xl border border-white/10 bg-navy-800 text-xs font-bold text-white hover:bg-navy-700 transition">
+                        🔄 تحديث الرسائل
+                    </button>
+                </div>
+
+                <div class="mb-4 flex flex-wrap items-center gap-3">
+                    <input id="waSearchInput" oninput="loadWhatsappMessages()" type="text" placeholder="ابحثي في نصوص الرسائل أو أسماء المرسال..."
+                        class="w-full md:w-80 rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-lime">
+                </div>
+
+                <div id="whatsappMessagesList" class="space-y-3">
+                    <div class="p-8 text-center text-slate-500">جاري تحميل رسائل الواتساب...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 5: INTEGRATIONS & SETTINGS ================= -->
+        <div id="viewSettings" class="view-panel hidden">
+            <div class="grid gap-6 md:grid-cols-2">
+                
+                <!-- Odoo ERP Configuration Card -->
+                <div class="glass-card rounded-3xl p-6 border border-white/10">
+                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-white/10">
+                        <span class="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 text-xl font-black">🏢</span>
+                        <div>
+                            <h3 class="text-lg font-black text-white">تكامل Odoo ERP System</h3>
+                            <p class="text-xs text-slate-400">XML-RPC Live Connection & Auth Credentials</p>
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleOdooSave(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">رابط Odoo Base URL *</label>
+                            <input id="odooUrl" type="url" required placeholder="https://mycompany.odoo.com" value="{{ odoo_config.credentials.base_url if odoo_config and odoo_config.credentials else '' }}"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-purple-400">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">اسم قاعدة البيانات (Database Name) *</label>
+                            <input id="odooDb" type="text" required placeholder="mycompany_db" value="{{ odoo_config.credentials.db_name if odoo_config and odoo_config.credentials else '' }}"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-purple-400">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">اسم المستخدم / البريد *</label>
+                            <input id="odooUser" type="text" required placeholder="admin@mycompany.com" value="{{ odoo_config.credentials.username if odoo_config and odoo_config.credentials else '' }}"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-purple-400">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">كلمة المرور / API Key *</label>
+                            <input id="odooPass" type="password" required placeholder="••••••••••••"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-purple-400">
+                        </div>
+
+                        <div id="odooTestResult" class="hidden p-3 rounded-xl text-xs font-bold border"></div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="button" onclick="testOdooConnection()" class="flex-1 rounded-xl border border-purple-500/40 bg-purple-500/10 p-3 font-bold text-purple-300 hover:bg-purple-500/20 transition text-xs">
+                                🔌 فحص الاتصال المباشر
+                            </button>
+                            <button type="submit" class="flex-1 rounded-xl bg-purple-500 p-3 font-black text-white hover:bg-purple-600 transition text-xs shadow-lg shadow-purple-500/20">
+                                💾 حفظ إعدادات Odoo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Google Sheets Configuration Card -->
+                <div class="glass-card rounded-3xl p-6 border border-white/10">
+                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-white/10">
+                        <span class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-xl font-black">📊</span>
+                        <div>
+                            <h3 class="text-lg font-black text-white">تكامل Google Sheets Live Sync</h3>
+                            <p class="text-xs text-slate-400">ربط الشيت وتعيين الأعمدة للتحويل المباشر إلى مشاريع</p>
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleSheetsSave(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">رابط الشيت المنشور أو معرف Google Sheet *</label>
+                            <input id="sheetsUrl" type="text" required placeholder="https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit" value="{{ google_config.credentials.sheet_url if google_config and google_config.credentials else '' }}"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-emerald-400">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">اسم ورقة العمل (Sheet Name)</label>
+                            <input id="sheetsName" type="text" placeholder="Sheet1" value="{{ google_config.credentials.sheet_name if google_config and google_config.credentials else 'Sheet1' }}"
+                                class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:outline-none focus:border-emerald-400">
+                        </div>
+
+                        <button type="button" onclick="testGoogleSheets()" class="w-full rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 font-bold text-emerald-300 hover:bg-emerald-500/20 transition text-xs">
+                            🔍 جلب عناوين الأعمدة والمعاينة
+                        </button>
+
+                        <!-- Column Mapping Dropdowns Container -->
+                        <div id="columnMappingSection" class="space-y-3 p-4 rounded-2xl bg-navy-900/60 border border-white/10">
+                            <h4 class="text-xs font-bold text-emerald-400 mb-2">تطابق حقول الشيت مع نظام المشاريع:</h4>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400">اسم المشروع -> </label>
+                                    <select id="mapName" class="col-map-select w-full rounded-lg border border-white/10 bg-navy-900 p-2 text-xs text-white">
+                                        <option value="">حدد العمود</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400">اسم العميل -> </label>
+                                    <select id="mapClient" class="col-map-select w-full rounded-lg border border-white/10 bg-navy-900 p-2 text-xs text-white">
+                                        <option value="">حدد العمود</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400">حالة المرحلة -> </label>
+                                    <select id="mapStatus" class="col-map-select w-full rounded-lg border border-white/10 bg-navy-900 p-2 text-xs text-white">
+                                        <option value="">حدد العمود</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400">تاريخ التسليم -> </label>
+                                    <select id="mapDeadline" class="col-map-select w-full rounded-lg border border-white/10 bg-navy-900 p-2 text-xs text-white">
+                                        <option value="">حدد العمود</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full rounded-xl bg-emerald-500 p-3 font-black text-navy-900 hover:bg-emerald-400 transition text-xs shadow-lg shadow-emerald-500/20">
+                            💾 حفظ الخريطة وبدء المزامنة
+                        </button>
+                    </form>
+                </div>
+
+                <!-- WhatsApp Scraping Chrome Extension Settings -->
+                <div class="glass-card rounded-3xl p-6 border border-white/10 md:col-span-2">
+                    <div class="flex items-center gap-3 mb-6 pb-3 border-b border-white/10">
+                        <span class="p-2.5 rounded-xl bg-lime/10 text-lime text-xl font-black">🧩</span>
+                        <div>
+                            <h3 class="text-lg font-black text-white">إعدادات إضافة الواتساب (WhatsApp Scraping Extension - Manifest V3)</h3>
+                            <p class="text-xs text-slate-400">ربط إضافة متصفح كروم المخصصة لجلب الرسائل والمجموعات في الوقت الفعلي</p>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-6 md:grid-cols-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">رمز الواجهة البرمجية المخصص (Client API Token)</label>
+                            <div class="flex gap-2">
+                                <input id="clientApiToken" type="text" readonly value="{{ user.api_token }}"
+                                    class="w-full rounded-xl border border-lime/30 bg-navy-900 p-3 text-xs text-lime font-mono focus:outline-none">
+                                <button onclick="copyApiToken()" class="px-4 py-3 rounded-xl bg-lime text-navy-900 font-bold text-xs hover:bg-lime/90 transition">
+                                    نسخ
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-2">انسخي هذا الرمز وضعي في نافذة إضافة كروم لربط الحساب.</p>
+                            
+                            <button onclick="rotateApiToken()" class="mt-3 px-4 py-2 rounded-xl border border-white/10 bg-navy-800 text-xs font-bold text-slate-300 hover:text-white transition">
+                                🔄 توليد رمز جديد
+                            </button>
+                        </div>
+
+                        <div class="p-4 rounded-2xl bg-navy-900/80 border border-white/10 space-y-2 text-xs text-slate-300">
+                            <h4 class="font-bold text-white mb-1">خطوات تثبيت إضافة Chrome Extension:</h4>
+                            <ol class="list-decimal list-inside space-y-1.5 leading-relaxed">
+                                <li>افتحي المتصفح وانتقلي إلى <code class="text-lime bg-navy-900 px-1 py-0.5 rounded">chrome://extensions</code></li>
+                                <li>فعّلي <b>Developer Mode</b> (وضع المطور) في أعلى اليسار.</li>
+                                <li>اضغطي <b>Load unpacked</b> واختاري مجلد <code class="text-lime bg-navy-900 px-1 py-0.5 rounded">chrome-extension</code> من مشروعنا.</li>
+                                <li>افتحي واتساب ويب <a href="https://web.whatsapp.com" target="_blank" class="text-sky-400 underline">web.whatsapp.com</a> واضغطي على أيقونة الإضافة، أدخلي الرمز، وابدئي المراقبة!</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 
     <!-- Add/Edit Modal -->
@@ -253,12 +532,12 @@
 
                 <div class="mt-4">
                     <label class="block text-xs font-bold text-slate-300 mb-1">📝 التقرير اليومي</label>
-                    <textarea id="pDailyReport" rows="3" placeholder="أدخلي مستجدات اليوم أو الملاحظات السريعة..." class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:border-lime focus:outline-none transition leading-relaxed"></textarea>
+                    <textarea id="pDailyReport" rows="3" placeholder="أدخلي مستجدات اليوم..." class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:border-lime focus:outline-none transition leading-relaxed"></textarea>
                 </div>
 
                 <div class="mt-4">
                     <label class="block text-xs font-bold text-slate-300 mb-1">💡 ملاحظات ووصف المشروع</label>
-                    <textarea id="pDescription" rows="2" placeholder="وصف عام للمشروع المتطلبات والروابط..." class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:border-lime focus:outline-none transition leading-relaxed"></textarea>
+                    <textarea id="pDescription" rows="2" placeholder="وصف عام للمشروع المتطلبات..." class="w-full rounded-xl border border-white/10 bg-navy-900 p-3 text-sm text-white focus:border-lime focus:outline-none transition leading-relaxed"></textarea>
                 </div>
 
                 <div class="mt-6 flex gap-3">
@@ -273,10 +552,9 @@
         </div>
     </div>
 
-    <!-- Floating Toast Container -->
+    <!-- Toast Container -->
     <div id="toastContainer" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- Data Injection & Frontend Logic -->
     <script>
         window.PROJECTS_DATA = {{ projects | tojson | safe }};
         window.STAGES = {{ stages | tojson | safe }};
@@ -286,12 +564,9 @@
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast-animate pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold shadow-2xl border backdrop-blur-md ${
-                type === 'success' 
-                    ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/30' 
-                    : 'bg-rose-950/90 text-rose-200 border-rose-500/30'
+                type === 'success' ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/30' : 'bg-rose-950/90 text-rose-200 border-rose-500/30'
             }`;
-            const icon = type === 'success' ? '✅' : '⚠️';
-            toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+            toast.innerHTML = `<span>${type === 'success' ? '✅' : '⚠️'}</span><span>${message}</span>`;
             container.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';
@@ -300,10 +575,268 @@
             }, 3000);
         }
 
+        function switchMainTab(tab) {
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('active', 'bg-lime', 'text-navy-900', 'font-black');
+                b.classList.add('text-slate-400');
+            });
+
+            if (tab === 'projects') {
+                document.getElementById('viewProjects').classList.remove('hidden');
+                document.getElementById('navTabProjects').classList.add('active', 'bg-lime', 'text-navy-900');
+            } else if (tab === 'odoo') {
+                document.getElementById('viewOdoo').classList.remove('hidden');
+                document.getElementById('navTabOdoo').classList.add('active', 'bg-lime', 'text-navy-900');
+                loadOdooRecords();
+            } else if (tab === 'sheets') {
+                document.getElementById('viewSheets').classList.remove('hidden');
+                document.getElementById('navTabSheets').classList.add('active', 'bg-lime', 'text-navy-900');
+            } else if (tab === 'whatsapp') {
+                document.getElementById('viewWhatsapp').classList.remove('hidden');
+                document.getElementById('navTabWhatsapp').classList.add('active', 'bg-lime', 'text-navy-900');
+                loadWhatsappMessages();
+            } else if (tab === 'settings') {
+                document.getElementById('viewSettings').classList.remove('hidden');
+                document.getElementById('navTabSettings').classList.add('active', 'bg-lime', 'text-navy-900');
+            }
+        }
+
+        async function handleLogout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+
+        // --- Odoo Frontend Functions ---
+        async function testOdooConnection() {
+            const resultBox = document.getElementById('odooTestResult');
+            resultBox.classList.remove('hidden', 'bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/30', 'bg-rust/20', 'text-rust', 'border-rust/30');
+            resultBox.innerText = 'جاري الاتصال بـ Odoo XML-RPC...';
+
+            const payload = {
+                base_url: document.getElementById('odooUrl').value,
+                db_name: document.getElementById('odooDb').value,
+                username: document.getElementById('odooUser').value,
+                password: document.getElementById('odooPass').value
+            };
+
+            try {
+                const res = await fetch('/api/integrations/odoo/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                resultBox.classList.remove('hidden');
+                if (data.success) {
+                    resultBox.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/30');
+                    resultBox.innerText = `✅ ${data.message} (إصدار Odoo: ${data.odoo_version})`;
+                } else {
+                    resultBox.classList.add('bg-rust/20', 'text-rust', 'border-rust/30');
+                    resultBox.innerText = `⚠️ ${data.message}`;
+                }
+            } catch (err) {
+                resultBox.classList.add('bg-rust/20', 'text-rust', 'border-rust/30');
+                resultBox.innerText = 'خطأ في الاتصال بالخادم.';
+            }
+        }
+
+        async function handleOdooSave(e) {
+            e.preventDefault();
+            const payload = {
+                base_url: document.getElementById('odooUrl').value,
+                db_name: document.getElementById('odooDb').value,
+                username: document.getElementById('odooUser').value,
+                password: document.getElementById('odooPass').value
+            };
+            try {
+                const res = await fetch('/api/integrations/odoo/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showToast('تم حفظ إعدادات Odoo بنجاح!', 'success');
+                } else {
+                    showToast('تعذر حفظ إعدادات Odoo', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الشبكة', 'error');
+            }
+        }
+
+        async function triggerOdooSync() {
+            showToast('جاري مزامنة بيانات Odoo...', 'success');
+            try {
+                const res = await fetch('/api/integrations/odoo/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: 'sale.order' })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`تم مزامنة ${data.synced_count} سجل من Odoo!`, 'success');
+                    loadOdooRecords();
+                } else {
+                    showToast(data.detail || 'حدث خطأ أثناء مزامنة Odoo', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الشبكة', 'error');
+            }
+        }
+
+        async function loadOdooRecords() {
+            const tbody = document.getElementById('odooRecordsTableBody');
+            try {
+                const res = await fetch('/api/integrations/odoo/records');
+                const items = await res.json();
+                if (!items || items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">لا توجد سجلات Odoo مزامنة حتى الآن. اضغطي على "مزامنة Odoo فوراً".</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = items.map(item => `
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="p-3.5 font-mono text-purple-300">#${item.odoo_id}</td>
+                        <td class="p-3.5 font-bold text-white">${item.record_name || 'سجل Odoo'}</td>
+                        <td class="p-3.5"><span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs">${item.model_name}</span></td>
+                        <td class="p-3.5 text-xs text-slate-400">${item.last_synced_at ? String(item.last_synced_at).split('T')[0] : '-'}</td>
+                        <td class="p-3.5 text-xs font-mono text-slate-400">${JSON.stringify(item.data).substring(0, 50)}...</td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rust">خطأ في جلب بيانات Odoo.</td></tr>`;
+            }
+        }
+
+        // --- Google Sheets Frontend Functions ---
+        async function testGoogleSheets() {
+            const sheet_url = document.getElementById('sheetsUrl').value;
+            const sheet_name = document.getElementById('sheetsName').value;
+            showToast('جاري الاتصال بـ Google Sheet...', 'success');
+
+            try {
+                const res = await fetch('/api/integrations/google-sheets/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sheet_url, sheet_name })
+                });
+                const data = await res.json();
+                if (data.success && data.headers) {
+                    showToast(data.message, 'success');
+                    populateColumnSelects(data.headers);
+                } else {
+                    showToast(data.message || 'فشل جلب عناوين الشيت', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الاتصال بالخادم', 'error');
+            }
+        }
+
+        function populateColumnSelects(headers) {
+            const selects = document.querySelectorAll('.col-map-select');
+            selects.forEach(select => {
+                select.innerHTML = '<option value="">حدد العمود</option>' + 
+                    headers.map(h => `<option value="${h}">${h}</option>`).join('');
+            });
+        }
+
+        async function handleSheetsSave(e) {
+            e.preventDefault();
+            const sheet_url = document.getElementById('sheetsUrl').value;
+            const sheet_name = document.getElementById('sheetsName').value;
+            const column_mapping = {
+                name: document.getElementById('mapName').value,
+                client: document.getElementById('mapClient').value,
+                status: document.getElementById('mapStatus').value,
+                deadline: document.getElementById('mapDeadline').value
+            };
+
+            try {
+                const res = await fetch('/api/integrations/google-sheets/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sheet_url, sheet_name, column_mapping })
+                });
+                if (res.ok) {
+                    showToast('تم حفظ خريطة أعمدة Google Sheets!', 'success');
+                    triggerSheetsSync();
+                } else {
+                    showToast('تعذر حفظ خريطة الشيت', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الاتصال', 'error');
+            }
+        }
+
+        async function triggerSheetsSync() {
+            showToast('جاري استيراد المشاريع من Google Sheets...', 'success');
+            try {
+                const res = await fetch('/api/integrations/google-sheets/sync', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message, 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast(data.detail || 'تعذر استيراد البيانات', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الشبكة', 'error');
+            }
+        }
+
+        // --- WhatsApp Frontend Functions ---
+        async function loadWhatsappMessages() {
+            const container = document.getElementById('whatsappMessagesList');
+            const q = document.getElementById('waSearchInput')?.value || '';
+            try {
+                const res = await fetch(`/api/whatsapp/messages?q=${encodeURIComponent(q)}`);
+                const messages = await res.json();
+                if (!messages || messages.length === 0) {
+                    container.innerHTML = `<div class="p-8 text-center text-slate-500">لا توجد رسائل مجلوبة من واتساب حتى الآن. شغّلي إضافة Chrome على web.whatsapp.com للمشاهدة المباشرة.</div>`;
+                    return;
+                }
+                container.innerHTML = messages.map(msg => `
+                    <div class="p-4 rounded-2xl bg-navy-900/80 border border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-lime/30 transition">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-2.5 py-0.5 rounded-full bg-lime/10 text-lime text-xs font-bold">${msg.group_name || 'واتساب'}</span>
+                                <span class="text-xs font-bold text-white">${msg.sender_name || 'مرسل غير معروف'}</span>
+                                ${msg.sender_number ? `<span class="text-[11px] font-mono text-slate-400">(${msg.sender_number})</span>` : ''}
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed">${msg.message_text}</p>
+                        </div>
+                        <span class="text-[11px] text-slate-500 whitespace-nowrap">${msg.msg_timestamp || ''}</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = `<div class="p-8 text-center text-rust">خطأ في تحميل رسائل الواتساب.</div>`;
+            }
+        }
+
+        function copyApiToken() {
+            const tokenInput = document.getElementById('clientApiToken');
+            tokenInput.select();
+            navigator.clipboard.writeText(tokenInput.value);
+            showToast('تم نسخ رمز Client API Token إلى الحافظة!', 'success');
+        }
+
+        async function rotateApiToken() {
+            try {
+                const res = await fetch('/api/integrations/token/generate', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok && data.api_token) {
+                    document.getElementById('clientApiToken').value = data.api_token;
+                    showToast('تم توليد وتحديث الرمز الجديد بنجاح!', 'success');
+                }
+            } catch (err) {
+                showToast('خطأ في توليد الرمز', 'error');
+            }
+        }
+
+        // Project Modal & Filtering (Preserved)
         function openModal(id = null) {
             const modal = document.getElementById('projectModal');
             modal.classList.add('active');
-            
             if (id) {
                 const project = window.PROJECTS_DATA.find(p => String(p.id) === String(id));
                 if (project) {
@@ -313,11 +846,8 @@
                     document.getElementById('pClient').value = project.client || '';
                     document.getElementById('pStatus').value = project.status || 'التحليل';
                     document.getElementById('pPriority').value = project.priority || 'MEDIUM';
-                    
-                    // Format dates safely for <input type="date"> (YYYY-MM-DD)
                     document.getElementById('pStartDate').value = project.start_date ? String(project.start_date).split('T')[0] : '';
                     document.getElementById('pDeadline').value = project.deadline ? String(project.deadline).split('T')[0] : '';
-                    
                     document.getElementById('pAssignedTo').value = project.assigned_to || '';
                     document.getElementById('pProgress').value = project.progress !== undefined ? project.progress : 0;
                     document.getElementById('pDailyReport').value = project.daily_report || '';
@@ -334,20 +864,11 @@
             document.getElementById('projectModal').classList.remove('active');
         }
 
-        // Close on backdrop click & Esc key
-        document.getElementById('projectModal').addEventListener('click', function(e) {
-            if (e.target === this) closeModal();
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeModal();
-        });
-
         async function saveProject(e) {
             e.preventDefault();
             const btn = document.getElementById('saveBtn');
-            const originalBtnHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = `<span class="animate-spin">⏳</span> <span>جاري الحفظ...</span>`;
+            btn.innerHTML = `<span>جاري الحفظ...</span>`;
 
             const id = document.getElementById('projectId').value;
             const payload = {
@@ -372,21 +893,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
                 if (res.ok) {
-                    showToast(id ? 'تم تحديث البيانات بنجاح!' : 'تم إضافة المشروع بنجاح!', 'success');
-                    setTimeout(() => window.location.reload(), 600);
+                    showToast('تم حفظ التغييرات بنجاح!', 'success');
+                    setTimeout(() => window.location.reload(), 500);
                 } else {
-                    const errData = await res.json().catch(() => ({}));
-                    const errMsg = errData.detail || 'تعذر حفظ البيانات، يرجى المحاولة لاحقاً';
-                    showToast(errMsg, 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = originalBtnHtml;
+                    const err = await res.json().catch(() => ({}));
+                    showToast(err.detail || 'تعذر حفظ البيانات', 'error');
                 }
             } catch (err) {
-                showToast('خطأ في الاتصال بالخادم: ' + err.message, 'error');
+                showToast('خطأ في الاتصال', 'error');
+            } finally {
                 btn.disabled = false;
-                btn.innerHTML = originalBtnHtml;
             }
         }
 
@@ -395,39 +912,16 @@
             try {
                 const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
                 if (res.ok) {
-                    showToast('تم حذف المشروع بنجاح', 'success');
+                    showToast('تم الحذف بنجاح', 'success');
                     setTimeout(() => window.location.reload(), 500);
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    showToast(errData.detail || 'حدث خطأ أثناء الحذف', 'error');
                 }
             } catch (err) {
-                showToast('خطأ في شبكة الاتصال: ' + err.message, 'error');
+                showToast('خطأ في شبكة الاتصال', 'error');
             }
         }
 
         function setKpiFilter(filterType) {
             activeKpiFilter = filterType;
-            
-            // Highlight KPI cards
-            const kpiCards = {
-                'ALL': 'kpiCardAll',
-                'URGENT': 'kpiCardUrgent',
-                'COMPLETED': 'kpiCardCompleted',
-                'REPORT': 'kpiCardReport'
-            };
-            
-            Object.keys(kpiCards).forEach(key => {
-                const el = document.getElementById(kpiCards[key]);
-                if (el) {
-                    if (key === filterType) {
-                        el.classList.add('ring-2', 'ring-lime');
-                    } else {
-                        el.classList.remove('ring-2', 'ring-lime');
-                    }
-                }
-            });
-
             filterProjects();
         }
 
@@ -442,10 +936,6 @@
             const q = document.getElementById('searchInput').value.toLowerCase().trim();
             const stage = document.getElementById('stageSelect').value;
             const priority = document.getElementById('prioritySelect').value;
-
-            let visibleCount = 0;
-            let visibleUrgent = 0;
-            let visibleStable = 0;
 
             document.querySelectorAll('.project-card').forEach(card => {
                 const text = card.innerText.toLowerCase();
@@ -464,25 +954,29 @@
                 else if (activeKpiFilter === 'COMPLETED') matchKpi = isCompleted;
                 else if (activeKpiFilter === 'REPORT') matchKpi = hasReport;
 
-                const isVisible = matchQ && matchStage && matchPriority && matchKpi;
-                card.style.display = isVisible ? 'block' : 'none';
-
-                if (isVisible) {
-                    visibleCount++;
-                    if (isUrgent) visibleUrgent++;
-                    else visibleStable++;
-                }
+                card.style.display = (matchQ && matchStage && matchPriority && matchKpi) ? 'block' : 'none';
             });
-
-            // Toggle empty placeholder & sections
-            const emptyState = document.getElementById('emptyResultsState');
-            const urgentSec = document.getElementById('urgentSection');
-            const stableSec = document.getElementById('stableSection');
-
-            if (urgentSec) urgentSec.style.display = visibleUrgent > 0 ? 'block' : 'none';
-            if (stableSec) stableSec.style.display = visibleStable > 0 ? 'block' : 'none';
-            if (emptyState) emptyState.classList.toggle('hidden', visibleCount > 0);
         }
+
+        // --- 1-Minute Live Auto Sync Loop ---
+        async function performLiveAutoSync() {
+            console.log("[Live Auto-Sync] Executing 1-minute live data update across all sources...");
+            try {
+                // 1. Trigger backend sync across Odoo & Google Sheets
+                await fetch('/api/integrations/sync-all', { method: 'POST' });
+
+                // 2. Refresh active views
+                if (typeof loadOdooRecords === 'function') loadOdooRecords();
+                if (typeof loadWhatsappMessages === 'function') loadWhatsappMessages();
+
+                showToast('⚡ تم تحديث البيانات بنجاح تلقائياً (كل دقيقة)', 'success');
+            } catch (err) {
+                console.error("[Live Auto-Sync Error]", err);
+            }
+        }
+
+        // Start 60-second periodic timer (every 1 minute)
+        setInterval(performLiveAutoSync, 60000);
     </script>
 </body>
 </html>

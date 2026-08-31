@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp Web Data Extraction Extension",
+  "version": "1.0.0",
+  "description": "Scrape WhatsApp Web messages, groups, sender details, and sync to Nehal Multi-Tenant Dashboard.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WhatsApp Web Scraper Dashboard Sync"
+  }
+}
