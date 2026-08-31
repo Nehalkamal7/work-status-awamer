@@ -586,17 +586,45 @@ async def get_me(current_user: Optional[dict] = Depends(get_current_user)):
 
 # --- Odoo Integration Endpoints ---
 
-@app.post("/api/integrations/odoo/test")
-async def test_odoo_connection(payload: OdooTestSchema):
-    url = payload.base_url.rstrip("/")
+import ssl
+
+def get_odoo_server_proxy(base_url: str):
+    """Normalize Odoo URL, bypass SSL verification issues, and return ServerProxies."""
+    url = base_url.strip()
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
+    
+    parsed = urllib.parse.urlparse(url)
+    clean_root = f"{parsed.scheme}://{parsed.netloc}"
+    
+    # Attempt root URL first, then provided path URL
+    candidate_urls = [clean_root]
+    clean_path = url.rstrip('/')
+    if clean_path and clean_path not in candidate_urls and not clean_path.endswith('/web') and not clean_path.endswith('/odoo'):
+        candidate_urls.insert(0, clean_path)
 
-    common_url = f"{url}/xmlrpc/2/common"
+    context = ssl._create_unverified_context()
+    last_error = None
+    
+    for cand in candidate_urls:
+        try:
+            transport = xmlrpc.client.SafeTransport(context=context) if cand.startswith("https") else xmlrpc.client.Transport()
+            common = xmlrpc.client.ServerProxy(f"{cand}/xmlrpc/2/common", transport=transport, allow_none=True)
+            v = common.version()
+            models = xmlrpc.client.ServerProxy(f"{cand}/xmlrpc/2/object", transport=transport, allow_none=True)
+            return cand, common, models, v, transport
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Odoo proxy attempt to {cand} failed: {e}")
+            
+    raise Exception(f"تعذر الاتصال بخادم Odoo على {base_url} ({last_error})")
+
+@app.post("/api/integrations/odoo/test")
+async def test_odoo_connection(payload: OdooTestSchema):
     try:
-        common = xmlrpc.client.ServerProxy(common_url, allow_none=True)
-        version_info = common.version()
+        clean_url, common, models, version_info, transport = get_odoo_server_proxy(payload.base_url)
         server_version = version_info.get("server_version", "Unknown") if isinstance(version_info, dict) else "Unknown"
+        
         uid = common.authenticate(payload.db_name, payload.username, payload.password, {})
         
         if uid:
@@ -604,18 +632,20 @@ async def test_odoo_connection(payload: OdooTestSchema):
                 "success": True,
                 "uid": uid,
                 "odoo_version": server_version,
-                "message": f"تم الاتصال بنجاح بنظام Odoo (المستخدم ID: {uid} | الإصدار: {server_version})"
+                "clean_url": clean_url,
+                "message": f"تم الاتصال بنجاح بالسيرفر Odoo {server_version} على ({clean_url}) | (مُعرّف المستخدم: {uid})"
             }
         else:
             return {
                 "success": False,
-                "message": "فشل المصادقة مع Odoo. يرجى التحقق من اسم قاعدة البيانات، اسم المستخدم، وكلمة المرور / API Key."
+                "clean_url": clean_url,
+                "message": f"تم الاتصال بسيرفر Odoo على ({clean_url})، ولكن فشلت المصادقة. يرجى التأكد من اسم قاعدة البيانات ({payload.db_name})، واسم المستخدم، وكلمة المرور/API Key."
             }
     except Exception as e:
         logger.error(f"Odoo connection test failed: {e}")
         return {
             "success": False,
-            "message": f"خطأ في الاتصال بنظام Odoo: {str(e)}"
+            "message": f"فشل الاتصال: {str(e)}"
         }
 
 @app.post("/api/integrations/odoo/save")
@@ -695,10 +725,7 @@ async def sync_odoo_data(
         raise HTTPException(status_code=400, detail="لم يتم إعداد بيانات ربط Odoo بعد. يرجى حفظ البيانات في تبويب الإعدادات أولاً.")
 
     creds = config["credentials"]
-    base_url = creds.get("base_url", "").rstrip("/")
-    if not base_url.startswith("http://") and not base_url.startswith("https://"):
-        base_url = f"https://{base_url}"
-    
+    base_url = creds.get("base_url", "")
     db_name = creds.get("db_name")
     username = creds.get("username")
     password = simple_decrypt(creds.get("enc_password", ""))
@@ -716,12 +743,11 @@ async def sync_odoo_data(
         fields_to_read = ['id', 'name', 'display_name', 'create_date']
 
     try:
-        common = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/common", allow_none=True)
+        clean_url, common, models, version_info, transport = get_odoo_server_proxy(base_url)
         uid = common.authenticate(db_name, username, password, {})
         if not uid:
-            raise HTTPException(status_code=401, detail="فشل المصادقة مع API الخاص بـ Odoo. يرجى مراجعة بيانات الاعتماد.")
+            raise HTTPException(status_code=401, detail=f"فشل المصادقة مع Odoo على ({clean_url}). يرجى التأكد من اسم قاعدة البيانات ({db_name})، واسم المستخدم، وكلمة المرور.")
         
-        models = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/object", allow_none=True)
         records = models.execute_kw(
             db_name, uid, password,
             model_name, 'search_read',
@@ -749,7 +775,6 @@ async def sync_odoo_data(
                 except Exception as ex:
                     logger.error(f"Error upserting odoo record: {ex}")
             
-            # Update last synced
             client.table("client_configs").update({
                 "last_synced_at": now_str
             }).eq("tenant_id", tenant_id).eq("provider", "ODOO").execute()
