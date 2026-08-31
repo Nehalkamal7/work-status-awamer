@@ -257,6 +257,45 @@
 
         <!-- ================= TAB 2: ODOO DATA VIEW ================= -->
         <div id="viewOdoo" class="view-panel hidden">
+            <!-- Odoo KPI Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div class="glass-card rounded-2xl p-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-lime/10 text-lime flex items-center justify-center font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] text-subtle font-semibold">حالة الاتصال بـ Odoo</p>
+                        <p id="odooKpiStatus" class="text-sm font-bold text-main">
+                            {% if odoo_config and odoo_config.status == 'CONNECTED' %}
+                                <span class="text-emerald-400 flex items-center gap-1">● متصل ومُفعل</span>
+                            {% else %}
+                                <span class="text-amber-400 flex items-center gap-1">○ غير متصل</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="glass-card rounded-2xl p-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] text-subtle font-semibold">إجمالي السجلات المتزامنة</p>
+                        <p id="odooKpiRecordCount" class="text-sm font-bold text-main">0 سجل</p>
+                    </div>
+                </div>
+                <div class="glass-card rounded-2xl p-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] text-subtle font-semibold">آخر مزامنة ناجحة</p>
+                        <p id="odooKpiLastSync" class="text-xs font-bold text-main">
+                            {{ odoo_config.last_synced_at.substring(0, 16) if (odoo_config and odoo_config.last_synced_at) else 'لم تتم بعد' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="glass-card rounded-3xl p-6 md:p-8">
                 <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
                     <div>
@@ -264,12 +303,19 @@
                             <svg class="w-5 h-5 text-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                             سجلات Odoo ERP المتزامنة
                         </h2>
-                        <p class="text-xs text-subtle mt-1">عرض أوامر المبيعات (sale.order) وشركاء الأعمال المجلوبة من نظام Odoo</p>
+                        <p class="text-xs text-subtle mt-1">عرض أوامر المبيعات والمشاريع وشركاء الأعمال المجلوبة عبر XML-RPC</p>
                     </div>
-                    <button onclick="triggerOdooSync()" class="px-4 py-2 rounded-xl bg-lime text-navy-900 font-bold text-xs hover:bg-lime/90 transition flex items-center gap-1.5">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        مزامنة Odoo الآن
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <select id="odooModelSelect" onchange="triggerOdooSync(this.value)" class="px-3 py-2 rounded-xl card-inner text-xs text-main font-semibold border border-slate-500/20 focus:outline-none focus:border-lime">
+                            <option value="sale.order">أوامر المبيعات (sale.order)</option>
+                            <option value="project.project">المشاريع (project.project)</option>
+                            <option value="res.partner">العملاء والشركاء (res.partner)</option>
+                        </select>
+                        <button onclick="triggerOdooSync()" class="px-4 py-2 rounded-xl bg-lime text-navy-900 font-bold text-xs hover:bg-lime/90 transition flex items-center gap-1.5 shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            مزامنة Odoo الآن
+                        </button>
+                    </div>
                 </div>
                 <div id="odooTableContainer" class="overflow-x-auto">
                     <p class="text-xs text-subtle">جاري تحميل سجلات Odoo...</p>
@@ -450,23 +496,23 @@
                             <svg class="w-4 h-4 text-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                             إعدادات Odoo ERP (XML-RPC)
                         </h3>
-                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ 'bg-lime/10 text-lime border-lime/20' if odoo_config else 'bg-slate-500/10 text-slate-400 border-slate-500/20' }}">
-                            {{ 'مُفعل' if odoo_config else 'غير مُربوط' }}
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border {{ 'bg-lime/10 text-lime border-lime/20' if (odoo_config and odoo_config.status == 'CONNECTED') else 'bg-slate-500/10 text-slate-400 border-slate-500/20' }}">
+                            {{ 'مُفعل' if (odoo_config and odoo_config.status == 'CONNECTED') else 'غير مُربوط' }}
                         </span>
                     </div>
                     <form onsubmit="handleSaveOdoo(event)" class="space-y-3 text-xs">
                         <div>
                             <label class="block font-semibold text-subtle mb-1">Odoo Base URL</label>
-                            <input type="url" id="odooUrlInput" required value="{{ odoo_config.config_json.base_url if odoo_config else '' }}" placeholder="https://mycompany.odoo.com" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
+                            <input type="url" id="odooUrlInput" required value="{{ odoo_config.credentials.base_url if (odoo_config and odoo_config.credentials and odoo_config.credentials.base_url) else '' }}" placeholder="https://mycompany.odoo.com" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
                         </div>
                         <div>
                             <label class="block font-semibold text-subtle mb-1">Database Name</label>
-                            <input type="text" id="odooDbInput" required value="{{ odoo_config.config_json.db_name if odoo_config else '' }}" placeholder="production_db" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
+                            <input type="text" id="odooDbInput" required value="{{ odoo_config.credentials.db_name if (odoo_config and odoo_config.credentials and odoo_config.credentials.db_name) else '' }}" placeholder="production_db" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <label class="block font-semibold text-subtle mb-1">Username / Email</label>
-                                <input type="text" id="odooUserInput" required value="{{ odoo_config.config_json.username if odoo_config else '' }}" placeholder="admin@company.com" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
+                                <input type="text" id="odooUserInput" required value="{{ odoo_config.credentials.username if (odoo_config and odoo_config.credentials and odoo_config.credentials.username) else '' }}" placeholder="admin@company.com" class="w-full px-3 py-2 rounded-xl card-inner text-main focus:outline-none focus:border-lime">
                             </div>
                             <div>
                                 <label class="block font-semibold text-subtle mb-1">API Key / Password</label>
@@ -744,61 +790,189 @@
             }
         }
 
-        async function loadOdooRecords() {
-            const container = document.getElementById('odooTableContainer');
-            try {
-                const res = await fetch('/api/integrations/odoo/records');
-                const data = await res.json();
-                if (res.ok && data.records && data.records.length > 0) {
-                    let html = `<table class="w-full text-xs text-right border-collapse"><thead><tr class="card-inner text-subtle border-b"><th class="p-3">المعرف</th><th class="p-3">النموذج</th><th class="p-3">الاسم / العميل</th><th class="p-3">المبلغ</th><th class="p-3">تاريخ المزامنة</th></tr></thead><tbody>`;
-                    data.records.forEach(r => {
-                        html += `<tr class="border-b border-slate-500/10 hover:card-inner"><td class="p-3 font-bold">${r.record_id || '-'}</td><td class="p-3">${r.model_name}</td><td class="p-3 font-semibold">${r.name || r.client_name || '-'}</td><td class="p-3 text-lime font-bold">${r.amount ? r.amount + ' SAR' : '-'}</td><td class="p-3 text-subtle">${r.created_at ? r.created_at.substring(0,10) : '-'}</td></tr>`;
-                    });
-                    html += `</tbody></table>`;
-                    container.innerHTML = html;
-                } else {
-                    container.innerHTML = `<p class="text-xs text-subtle p-4">لا توجد سجلات Odoo متزامنة بعد.</p>`;
-                }
-            } catch (err) {
-                container.innerHTML = `<p class="text-xs text-rust p-4">فشل تحميل سجلات Odoo</p>`;
-            }
-        }
+        // --- Odoo ERP Integration Handlers ---
+        async function testOdooConnection() {
+            const base_url = document.getElementById('odooUrlInput').value;
+            const db_name = document.getElementById('odooDbInput').value;
+            const username = document.getElementById('odooUserInput').value;
+            const password = document.getElementById('odooPassInput').value;
 
-        async function loadWhatsappMessages() {
-            const container = document.getElementById('whatsappTableContainer');
-            try {
-                const res = await fetch('/api/whatsapp/messages');
-                const data = await res.json();
-                if (res.ok && data.messages && data.messages.length > 0) {
-                    let html = `<table class="w-full text-xs text-right border-collapse"><thead><tr class="card-inner text-subtle border-b"><th class="p-3">المجموعة / المحادثة</th><th class="p-3">المرسل</th><th class="p-3">نص الرسالة</th><th class="p-3">الوقت</th></tr></thead><tbody>`;
-                    data.messages.forEach(m => {
-                        html += `<tr class="border-b border-slate-500/10 hover:card-inner"><td class="p-3 font-bold text-lime">${m.group_name || 'محادثة فردية'}</td><td class="p-3 font-semibold">${m.sender_name || m.sender_phone || 'مجهول'}</td><td class="p-3 text-main">${m.message_text}</td><td class="p-3 text-subtle">${m.timestamp || '-'}</td></tr>`;
-                    });
-                    html += `</tbody></table>`;
-                    container.innerHTML = html;
-                } else {
-                    container.innerHTML = `<p class="text-xs text-subtle p-4">لا توجد رسائل واتساب مجلوبة حتى الآن.</p>`;
-                }
-            } catch (err) {
-                container.innerHTML = `<p class="text-xs text-rust p-4">فشل تحميل رسائل واتساب</p>`;
+            if (!base_url || !db_name || !username || !password) {
+                showToast('يرجى إدخال كافة بيانات اتصال Odoo أولاً', 'error');
+                return;
             }
-        }
 
-        async function triggerOdooSync() {
             try {
-                showToast('جاري مزامنة Odoo...', 'info');
-                const res = await fetch('/api/integrations/odoo/sync', {
+                showToast('جاري اختبار الاتصال بنظام Odoo (XML-RPC)...', 'info');
+                const res = await fetch('/api/integrations/odoo/test', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model_name: 'sale.order' })
+                    body: JSON.stringify({ base_url, db_name, username, password })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(data.message || 'تم الاتصال بنجاح بنظام Odoo!', 'success');
+                } else {
+                    showToast(data.message || data.detail || 'فشل الاتصال بنظام Odoo', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الاتصال بالخادم عند اختبار Odoo', 'error');
+            }
+        }
+
+        async function handleSaveOdoo(e) {
+            e.preventDefault();
+            const base_url = document.getElementById('odooUrlInput').value;
+            const db_name = document.getElementById('odooDbInput').value;
+            const username = document.getElementById('odooUserInput').value;
+            const password = document.getElementById('odooPassInput').value;
+            const btn = document.getElementById('odooSaveBtn');
+
+            if (!base_url || !db_name || !username || !password) {
+                showToast('يرجى استكمال جميع حقول الربط مع Odoo', 'error');
+                return;
+            }
+
+            try {
+                if (btn) btn.disabled = true;
+                showToast('جاري حفظ إعدادات Odoo...', 'info');
+                const res = await fetch('/api/integrations/odoo/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_url, db_name, username, password })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    showToast(data.message, 'success');
-                    loadOdooRecords();
-                } else showToast(data.detail || 'تعذر المزامنة', 'error');
+                    showToast(data.message || 'تم حفظ إعدادات الربط بنجاح', 'success');
+                    const statusEl = document.getElementById('odooKpiStatus');
+                    if (statusEl) statusEl.innerHTML = '<span class="text-emerald-400 flex items-center gap-1">● متصل ومُفعل</span>';
+                    setTimeout(() => triggerOdooSync(), 800);
+                } else {
+                    showToast(data.detail || 'فشل حفظ إعدادات Odoo', 'error');
+                }
             } catch (err) {
-                showToast('خطأ في المزامنة', 'error');
+                showToast('خطأ في شبكة الاتصال', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function loadOdooRecords() {
+            const container = document.getElementById('odooTableContainer');
+            if (!container) return;
+            try {
+                const res = await fetch('/api/integrations/odoo/records');
+                const data = await res.json();
+                const records = Array.isArray(data) ? data : (data.records || []);
+                
+                const kpiCount = document.getElementById('odooKpiRecordCount');
+                if (kpiCount) kpiCount.innerText = `${records.length} سجل`;
+
+                if (res.ok && records.length > 0) {
+                    const lastSyncEl = document.getElementById('odooKpiLastSync');
+                    if (lastSyncEl && records[0].last_synced_at) {
+                        lastSyncEl.innerText = new Date(records[0].last_synced_at).toLocaleString('ar-SA');
+                    }
+
+                    let html = `
+                    <table class="w-full text-xs text-right border-collapse">
+                        <thead>
+                            <tr class="card-inner text-subtle border-b border-slate-500/20">
+                                <th class="p-3"># ID</th>
+                                <th class="p-3">النموذج (Model)</th>
+                                <th class="p-3">اسم السجل / العقد</th>
+                                <th class="p-3">العميل / الشريك</th>
+                                <th class="p-3">الحالة</th>
+                                <th class="p-3">المبلغ (SAR)</th>
+                                <th class="p-3">تاريخ المزامنة</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                    records.forEach(r => {
+                        const recData = r.data || r;
+                        const recordId = r.odoo_id || r.id || recData.id || '-';
+                        const modelName = r.model_name || 'sale.order';
+                        const recordName = r.record_name || recData.display_name || recData.name || '-';
+                        
+                        // Extract partner name
+                        let partnerName = '-';
+                        if (recData.partner_id && Array.isArray(recData.partner_id) && recData.partner_id.length > 1) {
+                            partnerName = recData.partner_id[1];
+                        } else if (typeof recData.partner_id === 'string') {
+                            partnerName = recData.partner_id;
+                        } else if (recData.email) {
+                            partnerName = recData.email;
+                        }
+
+                        // Extract state badge
+                        const state = recData.state || 'active';
+                        let stateBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/20">${state}</span>`;
+                        if (state === 'sale' || state === 'done') {
+                            stateBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">مؤكد</span>`;
+                        } else if (state === 'draft' || state === 'sent') {
+                            stateBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">مسودة</span>`;
+                        }
+
+                        let amountVal = '-';
+                        if (recData.amount_total !== undefined) {
+                            amountVal = Number(recData.amount_total).toLocaleString();
+                        } else if (r.amount) {
+                            amountVal = Number(r.amount).toLocaleString();
+                        }
+
+                        const syncDate = r.last_synced_at ? new Date(r.last_synced_at).toLocaleString('ar-SA') : (r.created_at ? new Date(r.created_at).toLocaleString('ar-SA') : '-');
+
+                        html += `
+                        <tr class="border-b border-slate-500/10 hover:card-inner transition">
+                            <td class="p-3 font-mono font-bold text-lime">#${recordId}</td>
+                            <td class="p-3 font-mono text-[11px] text-subtle">${modelName}</td>
+                            <td class="p-3 font-bold text-main">${recordName}</td>
+                            <td class="p-3 font-semibold text-subtle">${partnerName}</td>
+                            <td class="p-3">${stateBadge}</td>
+                            <td class="p-3 font-bold text-lime">${amountVal !== '-' ? amountVal + ' ر.س' : '-'}</td>
+                            <td class="p-3 text-[11px] text-subtle">${syncDate}</td>
+                        </tr>`;
+                    });
+                    html += `</tbody></table>`;
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `
+                    <div class="p-8 text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-500/10 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        </div>
+                        <h4 class="text-sm font-bold text-main mb-1">لا توجد سجلات Odoo متزامنة حتى الآن</h4>
+                        <p class="text-xs text-subtle mb-4">قم بإدخال بيانات الربط في تبويب الإعدادات ثم انقر على "مزامنة Odoo الآن".</p>
+                        <button onclick="triggerOdooSync()" class="px-4 py-2 rounded-xl bg-lime text-navy-900 font-bold text-xs hover:bg-lime/90 transition inline-flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            مزامنة Odoo الآن
+                        </button>
+                    </div>`;
+                }
+            } catch (err) {
+                container.innerHTML = `<p class="text-xs text-rust p-4">فشل تحميل سجلات Odoo. يرجى التأكد من إعداد بيانات الاتصال.</p>`;
+            }
+        }
+
+        async function triggerOdooSync(modelName = null) {
+            try {
+                const selectEl = document.getElementById('odooModelSelect');
+                const targetModel = modelName || (selectEl ? selectEl.value : 'sale.order');
+                showToast(`جاري مزامنة ${targetModel} من Odoo...`, 'info');
+                const res = await fetch('/api/integrations/odoo/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: targetModel })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || `تمت مزامنة ${data.synced_count || 0} سجل بنجاح!`, 'success');
+                    loadOdooRecords();
+                } else {
+                    showToast(data.detail || data.message || 'تعذر المزامنة مع Odoo', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في الاتصال أثناء المزامنة', 'error');
             }
         }
 

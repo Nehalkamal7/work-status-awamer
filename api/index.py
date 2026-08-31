@@ -596,25 +596,26 @@ async def test_odoo_connection(payload: OdooTestSchema):
     try:
         common = xmlrpc.client.ServerProxy(common_url, allow_none=True)
         version_info = common.version()
+        server_version = version_info.get("server_version", "Unknown") if isinstance(version_info, dict) else "Unknown"
         uid = common.authenticate(payload.db_name, payload.username, payload.password, {})
         
         if uid:
             return {
                 "success": True,
                 "uid": uid,
-                "odoo_version": version_info.get("server_version", "Unknown"),
-                "message": f"Successfully authenticated with Odoo (User ID: {uid})"
+                "odoo_version": server_version,
+                "message": f"تم الاتصال بنجاح بنظام Odoo (المستخدم ID: {uid} | الإصدار: {server_version})"
             }
         else:
             return {
                 "success": False,
-                "message": "Odoo Authentication failed. Please check Database, Username, or Password/API Key."
+                "message": "فشل المصادقة مع Odoo. يرجى التحقق من اسم قاعدة البيانات، اسم المستخدم، وكلمة المرور / API Key."
             }
     except Exception as e:
         logger.error(f"Odoo connection test failed: {e}")
         return {
             "success": False,
-            "message": f"Connection error: {str(e)}"
+            "message": f"خطأ في الاتصال بنظام Odoo: {str(e)}"
         }
 
 @app.post("/api/integrations/odoo/save")
@@ -623,7 +624,7 @@ async def save_odoo_config(
     current_user: Optional[dict] = Depends(get_current_user)
 ):
     if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail="التسجيل مطلوب")
     
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
@@ -649,7 +650,7 @@ async def save_odoo_config(
                 "status": "CONNECTED",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="tenant_id,provider").execute()
-            return {"status": "success", "data": res.data}
+            return {"status": "success", "message": "تم حفظ إعدادات الربط مع Odoo بنجاح", "data": res.data}
         except Exception as e:
             logger.error(f"Error saving Odoo config to Supabase: {e}")
     
@@ -665,7 +666,7 @@ async def save_odoo_config(
         "settings": settings_payload,
         "status": "CONNECTED"
     }
-    return {"status": "success", "message": "Odoo integration settings saved."}
+    return {"status": "success", "message": "تم حفظ إعدادات Odoo بنجاح."}
 
 @app.post("/api/integrations/odoo/sync")
 async def sync_odoo_data(
@@ -673,7 +674,7 @@ async def sync_odoo_data(
     current_user: Optional[dict] = Depends(get_current_user)
 ):
     if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail="التسجيل مطلوب")
     
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
@@ -691,7 +692,7 @@ async def sync_odoo_data(
         config = IN_MEMORY_STORE["configs"][tenant_id].get("ODOO")
 
     if not config or not config.get("credentials"):
-        raise HTTPException(status_code=400, detail="Odoo ERP credentials not configured. Please save settings first.")
+        raise HTTPException(status_code=400, detail="لم يتم إعداد بيانات ربط Odoo بعد. يرجى حفظ البيانات في تبويب الإعدادات أولاً.")
 
     creds = config["credentials"]
     base_url = creds.get("base_url", "").rstrip("/")
@@ -703,18 +704,29 @@ async def sync_odoo_data(
     password = simple_decrypt(creds.get("enc_password", ""))
 
     model_name = payload.model_name or "sale.order"
+    
+    # Define query fields based on target model
+    if model_name == "sale.order":
+        fields_to_read = ['id', 'name', 'display_name', 'create_date', 'state', 'amount_total', 'partner_id']
+    elif model_name == "project.project":
+        fields_to_read = ['id', 'name', 'display_name', 'create_date', 'partner_id']
+    elif model_name == "res.partner":
+        fields_to_read = ['id', 'name', 'display_name', 'email', 'phone', 'city']
+    else:
+        fields_to_read = ['id', 'name', 'display_name', 'create_date']
+
     try:
         common = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/common", allow_none=True)
         uid = common.authenticate(db_name, username, password, {})
         if not uid:
-            raise HTTPException(status_code=401, detail="Failed to authenticate with Odoo API.")
+            raise HTTPException(status_code=401, detail="فشل المصادقة مع API الخاص بـ Odoo. يرجى مراجعة بيانات الاعتماد.")
         
         models = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/object", allow_none=True)
         records = models.execute_kw(
             db_name, uid, password,
             model_name, 'search_read',
             [[]],
-            {'limit': 50, 'fields': ['id', 'name', 'display_name', 'create_date', 'state', 'amount_total', 'partner_id']}
+            {'limit': 50, 'fields': fields_to_read}
         )
 
         synced_count = 0
@@ -743,33 +755,49 @@ async def sync_odoo_data(
             }).eq("tenant_id", tenant_id).eq("provider", "ODOO").execute()
         else:
             synced_count = len(records)
+            for rec in records:
+                rec_id = rec.get("id")
+                rec_name = rec.get("display_name") or rec.get("name") or f"Record #{rec_id}"
+                IN_MEMORY_STORE["odoo_records"].append({
+                    "tenant_id": tenant_id,
+                    "model_name": model_name,
+                    "odoo_id": rec_id,
+                    "record_name": rec_name,
+                    "data": rec,
+                    "last_synced_at": now_str
+                })
 
         return {
             "status": "success",
+            "message": f"تمت مزامنة {synced_count} سجل بنجاح من نظام Odoo ({model_name})",
             "model_name": model_name,
             "synced_count": synced_count,
-            "records": records[:10]
+            "records": records[:20]
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Odoo sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"Odoo Sync Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في مزامنة Odoo: {str(e)}")
 
 @app.get("/api/integrations/odoo/records")
 async def get_odoo_records(current_user: Optional[dict] = Depends(get_current_user)):
     if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(status_code=401, detail="التسجيل مطلوب")
     
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
+    records = []
     if client:
         try:
             res = client.table("odoo_records").select("*").eq("tenant_id", tenant_id).order("last_synced_at", desc=True).limit(100).execute()
-            return res.data or []
+            records = res.data or []
         except Exception as e:
             logger.error(f"Error fetching odoo records: {e}")
-    return []
+    else:
+        records = [r for r in IN_MEMORY_STORE.get("odoo_records", []) if r.get("tenant_id") == tenant_id]
+
+    return {"status": "success", "records": records}
 
 # --- Google Sheets Integration Endpoints ---
 
