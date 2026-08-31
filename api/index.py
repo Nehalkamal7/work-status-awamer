@@ -44,15 +44,17 @@ STAGES = ["التحليل", "التصميم", "البرمجة", "الاختبا�
 # Supabase Client Singleton
 _supabase_client: Optional[Client] = None
 _supabase_initialized: bool = False
+DEFAULT_SUPABASE_KEY = "sb_publishable__8ghFjWSWHi7yD9Uewkb9Q_qOiMwsta"
 
 def get_supabase() -> Optional[Client]:
     global _supabase_client, _supabase_initialized
     if _supabase_initialized:
         return _supabase_client
     
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    if not url or not key or "your-project" in url:
+    url = os.getenv("SUPABASE_URL", "").strip()
+    key = os.getenv("SUPABASE_KEY", DEFAULT_SUPABASE_KEY).strip()
+    
+    if not url or "your-project" in url or "your-supabase-project" in url:
         _supabase_client = None
         _supabase_initialized = True
         return None
@@ -422,12 +424,12 @@ async def register(payload: RegisterSchema, response: Response):
         except Exception as e:
             logger.error(f"Error registering user in Supabase: {e}")
             user_data["id"] = str(secrets.token_hex(16))
-    else:
-        if user_data["email"] in IN_MEMORY_STORE["users"]:
-            raise HTTPException(status_code=400, detail="User with this email already exists.")
-        user_data["id"] = str(secrets.token_hex(16))
-        IN_MEMORY_STORE["users"][user_data["email"]] = user_data
-        IN_MEMORY_STORE["tokens"][api_token] = tenant_id
+    
+    if user_data["email"] in IN_MEMORY_STORE["users"] and not client:
+        raise HTTPException(status_code=400, detail="User with this email already exists.")
+        
+    IN_MEMORY_STORE["users"][user_data["email"]] = user_data
+    IN_MEMORY_STORE["tokens"][api_token] = tenant_id
 
     # Create JWT Token
     jwt_data = {
