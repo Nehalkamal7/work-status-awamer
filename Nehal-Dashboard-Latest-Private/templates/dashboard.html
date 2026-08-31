@@ -556,6 +556,15 @@
     <script>
         let activeKpiFilter = 'ALL';
 
+        // Clean URL token param if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+            document.cookie = `access_token=${urlToken}; path=/; max-age=604800; SameSite=Lax`;
+            localStorage.setItem('access_token', urlToken);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         // Initialize Theme from localStorage
         function toggleTheme() {
             const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';

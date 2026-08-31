@@ -409,7 +409,7 @@ async def render_dashboard(request: Request):
             notion_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_NOTION", {})
             slack_config = IN_MEMORY_STORE["client_configs"].get(f"{tenant_id}_SLACK", {})
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "dashboard.html",
         {
@@ -425,6 +425,12 @@ async def render_dashboard(request: Request):
             "slack_config": slack_config
         }
     )
+    
+    token_param = request.query_params.get("token")
+    if token_param:
+        response.set_cookie(key="access_token", value=token_param, max_age=86400 * 7, path="/", samesite="lax")
+        
+    return response
 
 # --- Authentication Endpoints ---
 
