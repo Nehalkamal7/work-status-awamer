@@ -166,9 +166,12 @@
                     body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
-                if (res.ok && data.status === 'success') {
+                if (res.ok && data.status === 'success' && data.access_token) {
+                    // Set cookie explicitly on client side
+                    document.cookie = `access_token=${data.access_token}; path=/; max-age=604800; SameSite=Lax`;
+                    localStorage.setItem('access_token', data.access_token);
                     showAlert('تم تسجيل الدخول بنجاح! جاري التوجيه...', true);
-                    setTimeout(() => window.location.href = '/', 600);
+                    setTimeout(() => { window.location.href = '/'; }, 500);
                 } else {
                     showAlert(data.detail || 'تعذر تسجيل الدخول. تحقق من البيانات المدخلة.');
                 }
@@ -199,9 +202,12 @@
                     body: JSON.stringify({ name, company_name, email, password, role })
                 });
                 const data = await res.json();
-                if (res.ok && data.status === 'success') {
+                if (res.ok && data.status === 'success' && data.access_token) {
+                    // Set cookie explicitly on client side
+                    document.cookie = `access_token=${data.access_token}; path=/; max-age=604800; SameSite=Lax`;
+                    localStorage.setItem('access_token', data.access_token);
                     showAlert('تم إنشاء المساحة بنجاح! جاري التوجيه...', true);
-                    setTimeout(() => window.location.href = '/', 600);
+                    setTimeout(() => { window.location.href = '/'; }, 500);
                 } else {
                     showAlert(data.detail || 'تعذر إنشاء الحساب.');
                 }

@@ -442,9 +442,8 @@ async def register(payload: RegisterSchema, response: Response):
         "api_token": api_token
     }
     token = create_jwt_token(jwt_data)
-    response.set_cookie(key="access_token", value=token, httponly=True, max_age=86400 * 7, samesite="lax")
     
-    return {
+    res = JSONResponse(content={
         "status": "success",
         "access_token": token,
         "user": {
@@ -456,10 +455,12 @@ async def register(payload: RegisterSchema, response: Response):
             "company_name": user_data["company_name"],
             "api_token": api_token
         }
-    }
+    })
+    res.set_cookie(key="access_token", value=token, httponly=False, max_age=86400 * 7, path="/", samesite="lax")
+    return res
 
 @app.post("/api/auth/login")
-async def login(payload: LoginSchema, response: Response):
+async def login(payload: LoginSchema):
     email = payload.email.lower().strip()
     client = get_supabase()
     user = None
@@ -514,18 +515,20 @@ async def login(payload: LoginSchema, response: Response):
         "api_token": user.get("api_token")
     }
     token = create_jwt_token(jwt_data)
-    response.set_cookie(key="access_token", value=token, httponly=True, max_age=86400 * 7, samesite="lax")
-
-    return {
+    
+    res = JSONResponse(content={
         "status": "success",
         "access_token": token,
         "user": jwt_data
-    }
+    })
+    res.set_cookie(key="access_token", value=token, httponly=False, max_age=86400 * 7, path="/", samesite="lax")
+    return res
 
 @app.post("/api/auth/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token")
-    return {"status": "success", "message": "Logged out successfully."}
+async def logout():
+    res = JSONResponse(content={"status": "success", "message": "Logged out successfully."})
+    res.delete_cookie(key="access_token", path="/")
+    return res
 
 @app.get("/api/auth/me")
 async def get_me(current_user: Optional[dict] = Depends(get_current_user)):
