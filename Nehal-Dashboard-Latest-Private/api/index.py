@@ -456,15 +456,21 @@ async def register(payload: RegisterSchema, response: Response):
             # Check existing
             existing = client.table("users").select("id").eq("email", user_data["email"]).execute()
             if existing and existing.data and len(existing.data) > 0:
-                raise HTTPException(status_code=400, detail="User with this email already exists.")
+                raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.")
             
             res = client.table("users").insert(user_data).execute()
-            if res and res.data:
+            if res and res.data and len(res.data) > 0:
                 user_data["id"] = res.data[0]["id"]
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Error registering user in Supabase: {e}")
+            err_str = str(e)
+            if "row-level security" in err_str.lower() or "42501" in err_str or "policy" in err_str.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="تعذر حفظ الحساب في Supabase بسبب قيود RLS. يرجى تشغيل كود supabase_schema.sql المحدث في Supabase SQL Editor."
+                )
             user_data["id"] = str(secrets.token_hex(16))
     
     if user_data["email"] in IN_MEMORY_STORE["users"] and not client:

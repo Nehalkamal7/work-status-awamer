@@ -298,7 +298,5 @@ CREATE POLICY "Allow tenant select on odoo_records" ON public.odoo_records FOR S
 CREATE POLICY "Allow tenant insert on odoo_records" ON public.odoo_records FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow tenant update on odoo_records" ON public.odoo_records FOR UPDATE USING (true);
 
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow tenant select on users" ON public.users FOR SELECT USING (true);
-CREATE POLICY "Allow tenant insert on users" ON public.users FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow tenant update on users" ON public.users FOR UPDATE USING (true);
+-- Disable RLS on users table so public user registrations and logins work seamlessly
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
