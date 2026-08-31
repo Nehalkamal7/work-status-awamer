@@ -991,17 +991,68 @@
             }
         }
 
+        async function testGoogleSheet() {
+            const sheet_url = document.getElementById('sheetUrlInput') ? document.getElementById('sheetUrlInput').value : '';
+            if (!sheet_url) {
+                showToast('يرجى إدخال رابط شيت جوجل أولاً', 'error');
+                return;
+            }
+            try {
+                showToast('جاري الفحص الذكي لشيت جوجل لقراءة الأعمدة...', 'info');
+                const res = await fetch('/api/integrations/google-sheets/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sheet_url })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(data.message || 'تم الاتصال بشيت جوجل بنجاح!', 'success');
+                    // Automatically save config after test
+                    await fetch('/api/integrations/google-sheets/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sheet_url })
+                    });
+                } else {
+                    showToast(data.message || data.detail || 'فشل قراءة المستند', 'error');
+                }
+            } catch (err) {
+                showToast('خطأ في قراءة بيانات الشيت', 'error');
+            }
+        }
+
         async function triggerSheetsSync() {
             try {
-                showToast('جاري مزامنة شيتات جوجل...', 'info');
+                const sheetInput = document.getElementById('sheetUrlInput');
+                const sheetUrl = sheetInput ? sheetInput.value.trim() : '';
+
+                if (sheetUrl) {
+                    showToast('جاري الحفظ والمزامنة التلقائية للشيت...', 'info');
+                    // Auto-save sheet URL config first
+                    const saveRes = await fetch('/api/integrations/google-sheets/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sheet_url: sheetUrl })
+                    });
+                    if (!saveRes.ok) {
+                        const saveErr = await saveRes.json().catch(() => ({}));
+                        showToast(saveErr.detail || 'تعذر الوصول إلى المستند. يرجى التأكد من نشر المستند ومشاركته للجميع.', 'error');
+                        return;
+                    }
+                } else {
+                    showToast('جاري مزامنة شيتات جوجل...', 'info');
+                }
+
                 const res = await fetch('/api/integrations/google-sheets/sync', { method: 'POST' });
                 const data = await res.json();
                 if (res.ok) {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'تمت المزامنة واستيراد المشاريع بنجاح!', 'success');
                     setTimeout(() => window.location.reload(), 1000);
-                } else showToast(data.detail || 'تعذر المزامنة', 'error');
+                } else {
+                    showToast(data.detail || data.message || 'تعذر المزامنة. يرجى التأكد من مشاركة المستند للجميع.', 'error');
+                }
             } catch (err) {
-                showToast('خطأ في المزامنة', 'error');
+                showToast('خطأ في شبكة الاتصال أثناء المزامنة', 'error');
             }
         }
 
