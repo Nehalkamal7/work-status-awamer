@@ -44,6 +44,7 @@ STAGES = ["التحليل", "التصميم", "البرمجة", "الاختبا�
 # Supabase Client Singleton
 _supabase_client: Optional[Client] = None
 _supabase_initialized: bool = False
+DEFAULT_SUPABASE_URL = "https://bzjqofutzhtagocctuiu.supabase.co"
 DEFAULT_SUPABASE_KEY = "sb_publishable__8ghFjWSWHi7yD9Uewkb9Q_qOiMwsta"
 
 def get_supabase() -> Optional[Client]:
@@ -51,13 +52,14 @@ def get_supabase() -> Optional[Client]:
     if _supabase_initialized:
         return _supabase_client
     
-    url = os.getenv("SUPABASE_URL", "").strip()
+    url = os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL).strip()
     key = os.getenv("SUPABASE_KEY", DEFAULT_SUPABASE_KEY).strip()
     
     if not url or "your-project" in url or "your-supabase-project" in url:
-        _supabase_client = None
-        _supabase_initialized = True
-        return None
+        url = DEFAULT_SUPABASE_URL
+    if not key:
+        key = DEFAULT_SUPABASE_KEY
+        
     try:
         _supabase_client = create_client(url, key)
     except Exception as e:
@@ -1036,6 +1038,9 @@ async def ingest_whatsapp_messages(
                 ingested_count += 1
             except Exception as ex:
                 logger.error(f"Error inserting scraped message: {ex}")
+                record["id"] = str(secrets.token_hex(16))
+                IN_MEMORY_STORE["scraped_messages"].append(record)
+                ingested_count += 1
         else:
             record["id"] = str(secrets.token_hex(16))
             IN_MEMORY_STORE["scraped_messages"].append(record)
