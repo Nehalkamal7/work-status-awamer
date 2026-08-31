@@ -27,12 +27,12 @@
         .glass-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+<body class="min-h-screen flex items-center justify-center p-4 md:p-6 relative overflow-y-auto">
     <!-- Background Glows -->
-    <div class="absolute -top-32 -left-32 w-96 h-96 bg-lime/10 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="fixed -top-32 -left-32 w-96 h-96 bg-lime/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="fixed -bottom-32 -right-32 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-    <div class="w-full max-w-md glass-card rounded-3xl p-8 shadow-2xl relative z-10 border border-white/10">
+    <div class="w-full max-w-md glass-card rounded-3xl p-6 md:p-8 shadow-2xl relative z-10 border border-white/10 my-auto max-h-[92vh] overflow-y-auto">
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-lime/10 text-lime text-3xl font-black mb-4 border border-lime/20 shadow-lg shadow-lime/10">
                 ⚡
