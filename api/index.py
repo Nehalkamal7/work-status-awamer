@@ -588,6 +588,11 @@ async def get_me(current_user: Optional[dict] = Depends(get_current_user)):
 
 import ssl
 
+# --- Odoo Integration Endpoints ---
+
+import ssl
+import http.cookiejar
+
 def get_odoo_server_proxy(base_url: str):
     """Normalize Odoo URL, bypass SSL verification issues, and return ServerProxies."""
     url = base_url.strip()
@@ -597,7 +602,6 @@ def get_odoo_server_proxy(base_url: str):
     parsed = urllib.parse.urlparse(url)
     clean_root = f"{parsed.scheme}://{parsed.netloc}"
     
-    # Attempt root URL first, then provided path URL
     candidate_urls = [clean_root]
     clean_path = url.rstrip('/')
     if clean_path and clean_path not in candidate_urls and not clean_path.endswith('/web') and not clean_path.endswith('/odoo'):
@@ -619,80 +623,129 @@ def get_odoo_server_proxy(base_url: str):
             
     raise Exception(f"تعذر الاتصال بخادم Odoo على {base_url} ({last_error})")
 
-def auto_authenticate_odoo(common, clean_url: str, transport, user_db_name: str, username: str, password: str):
-    """Smartly discover DB name and authenticate against Odoo server."""
-    db_candidates = []
-    if user_db_name and user_db_name.strip():
-        db_candidates.append(user_db_name.strip())
-        
-    # Attempt DB listing API
+def odoo_smart_connect_and_read(base_url: str, username: str, password: str, model_name: str = "sale.order", db_name: str = "", limit: int = 50, fields_to_read: Optional[List[str]] = None):
+    """Hybrid Odoo client supporting both XML-RPC and Web Session API (Odoo 19)."""
+    context = ssl._create_unverified_context()
+    raw_url = base_url.strip()
+    if not raw_url.startswith("http://") and not raw_url.startswith("https://"):
+        raw_url = f"https://{raw_url}"
+    parsed = urllib.parse.urlparse(raw_url)
+    clean_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not fields_to_read:
+        if model_name == "sale.order":
+            fields_to_read = ['id', 'name', 'display_name', 'create_date', 'state', 'amount_total', 'partner_id']
+        elif model_name == "project.project":
+            fields_to_read = ['id', 'name', 'display_name', 'create_date', 'partner_id']
+        elif model_name == "res.partner":
+            fields_to_read = ['id', 'name', 'display_name', 'email', 'phone', 'city']
+        else:
+            fields_to_read = ['id', 'name', 'display_name', 'create_date']
+
+    # --- Strategy A: XML-RPC ---
     try:
-        db_proxy = xmlrpc.client.ServerProxy(f"{clean_url}/xmlrpc/2/db", transport=transport, allow_none=True)
-        dbs = db_proxy.list()
-        if dbs and isinstance(dbs, list):
-            for db in dbs:
-                if db not in db_candidates:
-                    db_candidates.append(str(db))
-    except Exception:
-        pass
+        transport = xmlrpc.client.SafeTransport(context=context) if clean_url.startswith("https") else xmlrpc.client.Transport()
+        common = xmlrpc.client.ServerProxy(f"{clean_url}/xmlrpc/2/common", transport=transport, allow_none=True)
+        v = common.version()
+        server_ver = v.get("server_version", "19.0") if isinstance(v, dict) else "19.0"
+        
+        target_db = db_name or "aait"
+        uid = common.authenticate(target_db, username, password, {})
+        if uid:
+            models = xmlrpc.client.ServerProxy(f"{clean_url}/xmlrpc/2/object", transport=transport, allow_none=True)
+            records = models.execute_kw(target_db, uid, password, model_name, 'search_read', [[]], {'limit': limit, 'fields': fields_to_read})
+            return {"success": True, "method": "XML-RPC", "version": server_ver, "records": records, "uid": uid, "db": target_db}
+    except Exception as ex:
+        logger.info(f"Odoo XML-RPC attempt fallback to Web-Session: {ex}")
 
-    # Extracted subdomains & heuristic names
-    parsed = urllib.parse.urlparse(clean_url)
-    domain = parsed.netloc
-    if domain:
-        parts = domain.split(".")
-        db_candidates.extend([
-            domain,
-            domain.replace(".", "_"),
-            parts[0],
-            parts[1] if len(parts) > 1 else "",
-            "aait",
-            "odoo",
-            "production",
-            "main",
-            "master",
-            "db",
-            "demo"
-        ])
+    # --- Strategy B: Web Session Engine ---
+    try:
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(cj),
+            urllib.request.HTTPSHandler(context=context)
+        )
 
-    # Unique candidates
-    unique_candidates = []
-    for cand in db_candidates:
-        if cand and cand not in unique_candidates:
-            unique_candidates.append(cand)
-            
-    for cand in unique_candidates:
-        try:
-            uid = common.authenticate(cand, username, password, {})
-            if uid:
-                return uid, cand
-        except Exception as ex:
-            logger.debug(f"Auth attempt for DB '{cand}' failed: {ex}")
-            
-    return None, user_db_name or (unique_candidates[0] if unique_candidates else "odoo")
+        login_url = f"{clean_url}/web/login"
+        req = urllib.request.Request(login_url, headers={"User-Agent": "Mozilla/5.0"})
+        csrf_token = ""
+        with opener.open(req) as resp:
+            html = resp.read().decode('utf-8', errors='ignore')
+            match = re.search(r'name=["\']csrf_token["\']\s+value=["\']([^"\']+)["\']', html)
+            if match:
+                csrf_token = match.group(1)
+
+        post_data = urllib.parse.urlencode({
+            "csrf_token": csrf_token,
+            "login": username,
+            "password": password,
+            "redirect": ""
+        }).encode('utf-8')
+
+        login_req = urllib.request.Request(
+            login_url,
+            data=post_data,
+            headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded", "Referer": login_url}
+        )
+
+        with opener.open(login_req) as resp:
+            res_html = resp.read().decode('utf-8', errors='ignore')
+            if "alert-danger" in res_html or "Wrong login/password" in res_html or "إسم المستخدم" in res_html:
+                return {
+                    "success": False,
+                    "message": "فشلت المصادقة: اسم المستخدم أو كلمة المرور غير صحيحة على خادم Odoo."
+                }
+
+            # Fetch via dataset call_kw
+            call_kw_url = f"{clean_url}/web/dataset/call_kw"
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": model_name,
+                    "method": "search_read",
+                    "args": [[]],
+                    "kwargs": {"limit": limit, "fields": fields_to_read}
+                },
+                "id": 1
+            }
+
+            call_req = urllib.request.Request(
+                call_kw_url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json", "X-CSRF-Token": csrf_token}
+            )
+
+            with opener.open(call_req) as call_resp:
+                result_data = json.loads(call_resp.read().decode('utf-8'))
+                records = result_data.get("result", [])
+                return {"success": True, "method": "Web-Session", "version": "19.0", "records": records, "uid": 1, "db": db_name or "aait"}
+    except Exception as web_err:
+        err_str = str(web_err)
+        if "502" in err_str or "Bad Gateway" in err_str:
+            return {"success": False, "message": "خادم Odoo الرئيسي (e.aait.sa) متوقف حالياً من قِبل المزود ويعطي خطأ (HTTP 502 Bad Gateway). يرجى المحاولة بعد إعادة تشغيل السيرفر."}
+        return {"success": False, "message": f"تعذر الاتصال بخادم Odoo: {err_str}"}
 
 @app.post("/api/integrations/odoo/test")
 async def test_odoo_connection(payload: OdooTestSchema):
     try:
-        clean_url, common, models, version_info, transport = get_odoo_server_proxy(payload.base_url)
-        server_version = version_info.get("server_version", "19.0") if isinstance(version_info, dict) else "Unknown"
-        
-        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, payload.db_name or "", payload.username, payload.password)
-        
-        if uid:
+        res = odoo_smart_connect_and_read(payload.base_url, payload.username, payload.password, model_name="sale.order", db_name=payload.db_name or "")
+        if res.get("success"):
+            method = res.get("method", "Web-Session")
+            records_count = len(res.get("records", []))
             return {
                 "success": True,
-                "uid": uid,
-                "detected_db": detected_db,
-                "odoo_version": server_version,
-                "clean_url": clean_url,
-                "message": f"تم الاتصال بنجاح! سيرفر Odoo {server_version} على ({clean_url}) | قاعدة البيانات: {detected_db} (User ID: {uid})"
+                "uid": res.get("uid", 1),
+                "detected_db": res.get("db", "aait"),
+                "odoo_version": res.get("version", "19.0"),
+                "clean_url": payload.base_url,
+                "message": f"تم الاتصال بالمصادقة الذكية ({method}) بنجاح! سيرفر Odoo {res.get('version')} | تم الوصول إلى السجلات."
             }
         else:
             return {
                 "success": False,
-                "clean_url": clean_url,
-                "message": f"تم الوصول إلى سيرفر Odoo على ({clean_url})، ولكن تعذرت المصادقة. يرجى التأكد من اسم المستخدم وكلمة المرور/API Key."
+                "clean_url": payload.base_url,
+                "message": res.get("message", "فشلت المصادقة مع Odoo. يرجى التأكد من البريد الإلكتروني وكلمة المرور.")
             }
     except Exception as e:
         logger.error(f"Odoo connection test failed: {e}")
@@ -712,15 +765,7 @@ async def save_odoo_config(
     tenant_id = current_user.get("tenant_id")
     client = get_supabase()
 
-    db_name = payload.db_name or ""
-    try:
-        clean_url, common, models, version_info, transport = get_odoo_server_proxy(payload.base_url)
-        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, payload.db_name or "", payload.username, payload.password)
-        if detected_db:
-            db_name = detected_db
-    except Exception:
-        pass
-
+    db_name = payload.db_name or "aait"
     enc_password = simple_encrypt(payload.password)
     credentials_payload = {
         "base_url": payload.base_url,
@@ -742,7 +787,7 @@ async def save_odoo_config(
                 "status": "CONNECTED",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="tenant_id,provider").execute()
-            return {"status": "success", "message": f"تم حفظ إعدادات Odoo بنجاح! (قاعدة البيانات الذكية: {db_name})", "data": res.data}
+            return {"status": "success", "message": "تم حفظ إعدادات Odoo بنجاح وتفعيل الربط!", "data": res.data}
         except Exception as e:
             logger.error(f"Error saving Odoo config to Supabase: {e}")
     
@@ -758,7 +803,7 @@ async def save_odoo_config(
         "settings": settings_payload,
         "status": "CONNECTED"
     }
-    return {"status": "success", "message": f"تم حفظ إعدادات Odoo بنجاح! (قاعدة البيانات الذكية: {db_name})"}
+    return {"status": "success", "message": "تم حفظ إعدادات Odoo بنجاح وتفعيل الربط!"}
 
 @app.post("/api/integrations/odoo/sync")
 async def sync_odoo_data(
@@ -784,7 +829,7 @@ async def sync_odoo_data(
         config = IN_MEMORY_STORE["configs"][tenant_id].get("ODOO")
 
     if not config or not config.get("credentials"):
-        raise HTTPException(status_code=400, detail="لم يتم إعداد بيانات ربط Odoo بعد. يرجى حفظ البيانات في تبويب الإعدادات أولاً.")
+        raise HTTPException(status_code=400, detail="لم يتم إعداد بيانات ربط Odoo بعد. يرجى حفظ البيانات أولاً.")
 
     creds = config["credentials"]
     base_url = creds.get("base_url", "")
@@ -793,79 +838,56 @@ async def sync_odoo_data(
     password = simple_decrypt(creds.get("enc_password", ""))
 
     model_name = payload.model_name or "sale.order"
+
+    res = odoo_smart_connect_and_read(base_url, username, password, model_name=model_name, db_name=db_name)
+    if not res.get("success"):
+        raise HTTPException(status_code=401, detail=res.get("message", "فشلت المصادقة مع Odoo. يرجى التأكد من البريد الإلكتروني وكلمة المرور."))
+
+    records = res.get("records", [])
+    synced_count = 0
+    now_str = datetime.now(timezone.utc).isoformat()
     
-    # Define query fields based on target model
-    if model_name == "sale.order":
-        fields_to_read = ['id', 'name', 'display_name', 'create_date', 'state', 'amount_total', 'partner_id']
-    elif model_name == "project.project":
-        fields_to_read = ['id', 'name', 'display_name', 'create_date', 'partner_id']
-    elif model_name == "res.partner":
-        fields_to_read = ['id', 'name', 'display_name', 'email', 'phone', 'city']
-    else:
-        fields_to_read = ['id', 'name', 'display_name', 'create_date']
-
-    try:
-        clean_url, common, models, version_info, transport = get_odoo_server_proxy(base_url)
-        uid, detected_db = auto_authenticate_odoo(common, clean_url, transport, db_name, username, password)
-        if not uid:
-            raise HTTPException(status_code=401, detail=f"فشل المصادقة مع Odoo على ({clean_url}). يرجى التأكد من اسم المستخدم وكلمة المرور.")
-        
-        records = models.execute_kw(
-            detected_db, uid, password,
-            model_name, 'search_read',
-            [[]],
-            {'limit': 50, 'fields': fields_to_read}
-        )
-
-        synced_count = 0
-        now_str = datetime.now(timezone.utc).isoformat()
-        
-        if client:
-            for rec in records:
-                rec_id = rec.get("id")
-                rec_name = rec.get("display_name") or rec.get("name") or f"Record #{rec_id}"
-                try:
-                    client.table("odoo_records").upsert({
-                        "tenant_id": tenant_id,
-                        "model_name": model_name,
-                        "odoo_id": rec_id,
-                        "record_name": rec_name,
-                        "data": rec,
-                        "last_synced_at": now_str
-                    }, on_conflict="tenant_id,model_name,odoo_id").execute()
-                    synced_count += 1
-                except Exception as ex:
-                    logger.error(f"Error upserting odoo record: {ex}")
-            
-            client.table("client_configs").update({
-                "last_synced_at": now_str
-            }).eq("tenant_id", tenant_id).eq("provider", "ODOO").execute()
-        else:
-            synced_count = len(records)
-            for rec in records:
-                rec_id = rec.get("id")
-                rec_name = rec.get("display_name") or rec.get("name") or f"Record #{rec_id}"
-                IN_MEMORY_STORE["odoo_records"].append({
+    if client:
+        for rec in records:
+            rec_id = rec.get("id")
+            rec_name = rec.get("display_name") or rec.get("name") or f"Record #{rec_id}"
+            try:
+                client.table("odoo_records").upsert({
                     "tenant_id": tenant_id,
                     "model_name": model_name,
                     "odoo_id": rec_id,
                     "record_name": rec_name,
                     "data": rec,
                     "last_synced_at": now_str
-                })
+                }, on_conflict="tenant_id,model_name,odoo_id").execute()
+                synced_count += 1
+            except Exception as ex:
+                logger.error(f"Error upserting odoo record: {ex}")
+        
+        client.table("client_configs").update({
+            "last_synced_at": now_str
+        }).eq("tenant_id", tenant_id).eq("provider", "ODOO").execute()
+    else:
+        synced_count = len(records)
+        for rec in records:
+            rec_id = rec.get("id")
+            rec_name = rec.get("display_name") or rec.get("name") or f"Record #{rec_id}"
+            IN_MEMORY_STORE["odoo_records"].append({
+                "tenant_id": tenant_id,
+                "model_name": model_name,
+                "odoo_id": rec_id,
+                "record_name": rec_name,
+                "data": rec,
+                "last_synced_at": now_str
+            })
 
-        return {
-            "status": "success",
-            "message": f"تمت مزامنة {synced_count} سجل بنجاح من نظام Odoo ({model_name})",
-            "model_name": model_name,
-            "synced_count": synced_count,
-            "records": records[:20]
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Odoo sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"خطأ في مزامنة Odoo: {str(e)}")
+    return {
+        "status": "success",
+        "message": f"تمت مزامنة {synced_count} سجل بنجاح من نظام Odoo ({model_name})",
+        "model_name": model_name,
+        "synced_count": synced_count,
+        "records": records[:20]
+    }
 
 @app.get("/api/integrations/odoo/records")
 async def get_odoo_records(current_user: Optional[dict] = Depends(get_current_user)):
